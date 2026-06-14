@@ -3,150 +3,241 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>مُتابع القطيع v2.7</title>
+    <title>مُتابع القطيع v3.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        #formPanel { transition: transform 0.3s ease; }
+        #formBackdrop { transition: opacity 0.3s ease; }
+        .card-details { transition: max-height 0.25s ease, opacity 0.2s ease; }
+        .toast-enter { animation: toastIn 0.3s ease forwards; }
+        .toast-exit { animation: toastOut 0.3s ease forwards; }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(1rem); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateY(0); }
+            to   { opacity: 0; transform: translateY(1rem); }
+        }
+    </style>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen font-sans relative">
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans relative pb-24">
 
-    <div class="container mx-auto p-4 max-w-7xl">
-        <header class="text-center my-6">
-            <h1 class="text-3xl font-bold text-blue-400">مُتابع القطيع (FlockTracker)</h1>
-            <p class="text-gray-400 text-sm mt-1">نسخة محسنة لعرض السجلات والملاحظات الطويلة</p>
+    <div class="container mx-auto p-4 max-w-5xl">
+        <header class="my-6">
+            <div class="text-center mb-5">
+                <h1 class="text-3xl font-bold text-blue-400">مُتابع القطيع (FlockTracker)</h1>
+                <p class="text-gray-400 text-sm mt-1">إدارة القطيع — عرض بطاقات وتفاصيل موسّعة</p>
+            </div>
+            <div id="statsBar" class="grid grid-cols-3 gap-3 text-center">
+                <div class="bg-gray-800 border border-gray-700 rounded-xl p-3">
+                    <div id="statTotal" class="text-2xl font-bold text-blue-400">0</div>
+                    <div class="text-xs text-gray-400 mt-0.5">إجمالي القطيع</div>
+                </div>
+                <div class="bg-gray-800 border border-gray-700 rounded-xl p-3">
+                    <div id="statBreeds" class="text-2xl font-bold text-emerald-400">0</div>
+                    <div class="text-xs text-gray-400 mt-0.5">سلالات</div>
+                </div>
+                <div class="bg-gray-800 border border-gray-700 rounded-xl p-3">
+                    <div id="statNotes" class="text-2xl font-bold text-amber-400">0</div>
+                    <div class="text-xs text-gray-400 mt-0.5">لديهم ملاحظات</div>
+                </div>
+            </div>
         </header>
 
-        <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
-            
-            <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 h-fit order-1 xl:order-2 xl:col-span-1">
-                <h2 id="formTitle" class="text-xl font-bold mb-4 text-center border-b border-gray-700 pb-2 text-blue-400">تسجيل رأس جديد</h2>
-                
-                <form id="sheepForm" class="space-y-4 text-right">
-                    <input type="hidden" id="formMode" value="CREATE">
+        <main class="bg-gray-800 p-4 sm:p-6 rounded-xl shadow-lg border border-gray-700">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <h2 class="text-lg font-bold text-right">سجل القطيع</h2>
+                <p id="resultsCount" class="text-xs text-gray-500 text-right"></p>
+            </div>
 
+            <div class="mb-3">
+                <input type="text" id="searchBar" placeholder="ابحث برقم الخروف، الاسم، السلالة، أو الملاحظات..."
+                    class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+            </div>
+
+            <div id="breedFilters" class="flex flex-wrap gap-2 mb-5"></div>
+
+            <div id="sheepList" class="space-y-3"></div>
+
+            <div id="emptyState" class="hidden text-center py-16 px-4">
+                <div class="text-5xl mb-4 opacity-40">🐑</div>
+                <p class="text-gray-400 text-sm mb-4">لا توجد سجلات بعد — ابدأ بإضافة أول رأس في القطيع</p>
+                <button onclick="openFormPanel(true)" class="bg-blue-600 hover:bg-blue-700 transition font-semibold py-2.5 px-6 rounded-lg text-sm">
+                    + تسجيل رأس جديد
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Floating add button -->
+    <button id="fabAdd" onclick="openFormPanel(true)"
+        class="fixed bottom-6 left-6 z-30 bg-blue-600 hover:bg-blue-500 text-white w-14 h-14 rounded-full shadow-lg shadow-blue-900/50 flex items-center justify-center text-2xl font-light transition hover:scale-105 active:scale-95"
+        title="تسجيل رأس جديد" aria-label="تسجيل رأس جديد">+</button>
+
+    <!-- Form slide-over backdrop -->
+    <div id="formBackdrop" onclick="closeFormPanel()"
+        class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden opacity-0"></div>
+
+    <!-- Form slide-over panel -->
+    <div id="formPanel"
+        class="fixed top-0 right-0 h-full w-full max-w-md bg-gray-800 border-l border-gray-700 z-50 flex flex-col translate-x-full shadow-2xl">
+        <div class="flex items-center justify-between p-5 border-b border-gray-700 shrink-0">
+            <button onclick="closeFormPanel()" class="text-gray-400 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-700 transition" aria-label="إغلاق">&times;</button>
+            <h2 id="formTitle" class="text-lg font-bold text-blue-400">تسجيل رأس جديد</h2>
+        </div>
+        <div class="overflow-y-auto flex-1 p-5">
+            <form id="sheepForm" class="space-y-4 text-right">
+                <input type="hidden" id="formMode" value="CREATE">
+
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-300">رقم الخروف *</label>
+                    <input type="text" id="tag_id" required class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-300">اسم الخروف</label>
+                    <input type="text" id="name" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-300">نوع / سلالة الخروف</label>
+                    <input type="text" id="breed" list="breedOptions" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500" placeholder="اكتب أو اختر...">
+                    <datalist id="breedOptions">
+                        <option value="دروبر">
+                        <option value="سفلك">
+                        <option value="عساف">
+                        <option value="بلدي">
+                    </datalist>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-300">تاريخ الولادة</label>
+                    <input type="date" id="birth_date" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="p-3 bg-gray-700/30 rounded-lg border border-gray-700 space-y-3">
+                    <span class="block text-xs font-bold text-gray-400">بيانات الشراء</span>
                     <div>
-                        <label class="block text-sm font-medium mb-1 text-gray-300">رقم الخروف *</label>
-                        <input type="text" id="tag_id" required class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50">
+                        <label class="block text-xs font-medium mb-1 text-gray-400">تاريخ الشراء</label>
+                        <input type="date" id="purchase_date" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1 text-gray-300">اسم الخروف</label>
-                        <input type="text" id="name" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1 text-gray-300">نوع / سلالة الخروف</label>
-                        <input type="text" id="breed" list="breedOptions" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500" placeholder="اكتب أو اختر...">
-                        <datalist id="breedOptions">
-                            <option value="دروبر">
-                            <option value="سفلك">
-                            <option value="عساف">
-                            <option value="بلدي">
-                        </datalist>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1 text-gray-300">تاريخ الولادة</label>
-                        <input type="date" id="birth_date" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500 text-right">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1 text-gray-300">تاريخ الشراء</label>
-                        <input type="date" id="purchase_date" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500 text-right">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1 text-gray-300">سعر الشراء</label>
+                        <label class="block text-xs font-medium mb-1 text-gray-400">سعر الشراء</label>
                         <input type="number" step="0.01" id="purchase_price" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1 text-gray-300">مكان الشراء</label>
+                        <label class="block text-xs font-medium mb-1 text-gray-400">مكان الشراء</label>
                         <input type="text" id="purchase_location" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
-                    <div class="p-3 bg-gray-700/30 rounded-lg border border-gray-700 space-y-3">
-                        <span class="block text-xs font-bold text-blue-400 uppercase tracking-wide">بيانات التلقيح</span>
-                        <div>
-                            <label class="block text-xs font-medium mb-1 text-gray-400">تاريخ التلقيح</label>
-                            <input type="date" id="breeding_date" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500 text-right">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium mb-1 text-gray-400">نوع التلقيح</label>
-                            <select id="breeding_type" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="">غير محدد</option>
-                                <option value="طبيعي">طبيعي</option>
-                                <option value="صناعي">صناعي</option>
-                            </select>
-                        </div>
+                </div>
+                <div class="p-3 bg-gray-700/30 rounded-lg border border-gray-700 space-y-3">
+                    <span class="block text-xs font-bold text-blue-400">بيانات التلقيح</span>
+                    <div>
+                        <label class="block text-xs font-medium mb-1 text-gray-400">تاريخ التلقيح</label>
+                        <input type="date" id="breeding_date" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1 text-gray-300">ملاحظات عامة / سجلات علاجية</label>
-                        <textarea id="notes" rows="4" placeholder="أدخل الملاحظات واليوميات هنا..." class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500 text-xs resize-none"></textarea>
+                        <label class="block text-xs font-medium mb-1 text-gray-400">نوع التلقيح</label>
+                        <select id="breeding_type" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">غير محدد</option>
+                            <option value="طبيعي">طبيعي</option>
+                            <option value="صناعي">صناعي</option>
+                        </select>
                     </div>
-
-                    <button type="submit" id="submitBtn" class="w-full bg-blue-600 hover:bg-blue-700 transition font-bold py-3 px-4 rounded-lg mt-2">
-                        حفظ البيانات
-                    </button>
-                    
-                    <button type="button" id="cancelBtn" onclick="resetFormState()" class="w-full bg-gray-700 hover:bg-gray-600 transition font-medium py-2 px-4 rounded-lg hidden">
-                        إلغاء التعديل
-                    </button>
-                </form>
-            </div>
-
-            <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 order-2 lg:order-1 xl:col-span-3 flex flex-col">
-                <h2 class="text-xl font-bold mb-4 text-center lg:text-right">سجل البيانات الحالي</h2>
-                
-                <div class="mb-4">
-                    <input type="text" id="searchBar" placeholder="🔍 ابحث هنا بأي معلومة (بما في ذلك الملاحظات واليوميات المخفية)..." class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm">
                 </div>
-
-                <div class="overflow-x-auto rounded-lg border border-gray-700">
-                    <table class="w-full text-center border-collapse text-xs md:text-sm min-w-[950px]">
-                        <thead class="bg-blue-900/60 text-blue-300 font-bold border-b border-gray-700">
-                            <tr>
-                                <th class="p-2.5">رقم الخروف</th>
-                                <th class="p-2.5">الاسم</th>
-                                <th class="p-2.5">النوع/السلالة</th>
-                                <th class="p-2.5">تاريخ الولادة</th>
-                                <th class="p-2.5">شراء (التاريخ / السعر / المكان)</th>
-                                <th class="p-2.5">التلقيح (التاريخ / النوع)</th>
-                                <th class="p-2.5">السجل والملاحظات</th>
-                                <th class="p-2.5">خيارات الإدارة</th>
-                            </tr>
-                        </thead>
-                        <tbody id="sheepTableBody" class="divide-y divide-gray-700">
-                            </tbody>
-                    </table>
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-300">ملاحظات عامة / سجلات علاجية</label>
+                    <textarea id="notes" rows="4" placeholder="أدخل الملاحظات واليوميات هنا..." class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none"></textarea>
                 </div>
-            </div>
-
+            </form>
+        </div>
+        <div class="p-5 border-t border-gray-700 shrink-0 space-y-2 bg-gray-800/95">
+            <button type="submit" form="sheepForm" id="submitBtn" class="w-full bg-blue-600 hover:bg-blue-700 transition font-bold py-3 px-4 rounded-lg">
+                حفظ البيانات
+            </button>
+            <button type="button" id="cancelBtn" onclick="closeFormPanel(); resetFormState();" class="w-full bg-gray-700 hover:bg-gray-600 transition font-medium py-2 px-4 rounded-lg hidden">
+                إلغاء
+            </button>
         </div>
     </div>
 
+    <!-- Notes modal -->
     <div id="notesModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300" onclick="closeNotesModal()">
         <div class="bg-gray-800 border border-gray-700 w-full max-w-lg p-6 rounded-xl shadow-2xl relative mx-4 text-right flex flex-col max-h-[80vh]" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between border-b border-gray-700 pb-3 mb-4">
                 <button onclick="closeNotesModal()" class="text-gray-400 hover:text-white font-bold text-lg">&times;</button>
                 <h3 id="modalHeader" class="text-lg font-bold text-blue-400">سجل ملاحظات الخروف</h3>
             </div>
-            <div id="modalBody" class="text-sm text-gray-300 overflow-y-auto whitespace-pre-wrap break-words pr-2 leading-relaxed bg-gray-900/40 p-4 rounded-lg border border-gray-700/50 flex-1">
-                </div>
+            <div id="modalBody" class="text-sm text-gray-300 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed bg-gray-900/40 p-4 rounded-lg border border-gray-700/50 flex-1"></div>
             <div class="mt-4 pt-2 border-t border-gray-700 flex justify-end">
-                <button onclick="closeNotesModal()" class="bg-gray-700 hover:bg-gray-600 text-white text-xs font-semibold px-4 py-2 rounded-lg transition">إغلاق النافذة</button>
+                <button onclick="closeNotesModal()" class="bg-gray-700 hover:bg-gray-600 text-white text-xs font-semibold px-4 py-2 rounded-lg transition">إغلاق</button>
             </div>
         </div>
     </div>
 
+    <!-- Toast container -->
+    <div id="toastContainer" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center pointer-events-none w-full max-w-sm px-4"></div>
+
     <script>
         let allSheep = [];
+        let activeBreedFilter = '';
+        let expandedCards = new Set();
 
         document.addEventListener('DOMContentLoaded', () => {
             fetchSheep();
             fetchBreeds();
         });
 
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const colors = {
+                success: 'bg-emerald-800 border-emerald-600 text-emerald-100',
+                error:   'bg-red-900 border-red-700 text-red-100',
+                info:    'bg-gray-700 border-gray-600 text-gray-100'
+            };
+            toast.className = `pointer-events-auto toast-enter px-4 py-3 rounded-lg border text-sm font-medium shadow-lg text-center w-full ${colors[type] || colors.info}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.remove('toast-enter');
+                toast.classList.add('toast-exit');
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        function openFormPanel(reset = false) {
+            if (reset) resetFormState();
+            document.getElementById('formBackdrop').classList.remove('hidden');
+            document.getElementById('formPanel').classList.remove('translate-x-full');
+            requestAnimationFrame(() => {
+                document.getElementById('formBackdrop').classList.remove('opacity-0');
+            });
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeFormPanel() {
+            document.getElementById('formBackdrop').classList.add('opacity-0');
+            document.getElementById('formPanel').classList.add('translate-x-full');
+            document.body.style.overflow = '';
+            setTimeout(() => document.getElementById('formBackdrop').classList.add('hidden'), 300);
+        }
+
         async function fetchBreeds() {
             try {
                 const response = await fetch('/api/breeds');
                 const cloudBreeds = await response.json();
                 const datalist = document.getElementById('breedOptions');
-                const defaults = ["دروبر", "سفلك", "عساف", "بلدي"];
-                
+                const defaults = ['دروبر', 'سفلك', 'عساف', 'بلدي'];
                 cloudBreeds.forEach(b => {
-                    if(!defaults.includes(b)) {
+                    if (!defaults.includes(b)) {
                         const opt = document.createElement('option');
                         opt.value = b;
                         datalist.appendChild(opt);
@@ -159,63 +250,182 @@
             try {
                 const response = await fetch('/api/sheep');
                 allSheep = await response.json();
-                renderTable(allSheep);
-            } catch (error) { console.error(error); }
+                updateStats();
+                renderBreedFilters();
+                applyFilters();
+            } catch (error) {
+                console.error(error);
+                showToast('تعذر تحميل بيانات القطيع', 'error');
+            }
         }
 
-        function renderTable(data) {
-            const tbody = document.getElementById('sheepTableBody');
-            tbody.innerHTML = '';
+        function updateStats() {
+            const breeds = new Set(allSheep.map(s => s.breed).filter(Boolean));
+            const withNotes = allSheep.filter(s => s.notes && s.notes.trim()).length;
+            document.getElementById('statTotal').textContent = allSheep.length;
+            document.getElementById('statBreeds').textContent = breeds.size;
+            document.getElementById('statNotes').textContent = withNotes;
+        }
 
-            data.forEach(s => {
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-gray-700/50 transition text-gray-200";
-                
-                const nameTxt = s.name || "<span class='text-gray-500'>-</span>";
-                const breedTxt = s.breed || "<span class='text-gray-500'>-</span>";
-                const birthTxt = s.birth_date || "<span class='text-gray-500'>-</span>";
-                
-                const pDate = s.purchase_date || "-";
-                const pPrice = s.purchase_price ? `${s.purchase_price}` : "-";
-                const pLoc = s.purchase_location || "-";
-                const purchaseCombined = (pDate==='-' && pPrice==='-' && pLoc==='-') ? "-" : `${pDate} / ${pPrice} / ${pLoc}`;
+        function renderBreedFilters() {
+            const container = document.getElementById('breedFilters');
+            const breeds = [...new Set(allSheep.map(s => s.breed).filter(Boolean))].sort();
+            const chipClass = (active) => active
+                ? 'bg-blue-600 border-blue-500 text-white'
+                : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600';
 
-                const bDate = s.breeding_date || "-";
-                const bType = s.breeding_type || "-";
-                const breedingCombined = (bDate==='-' && bType==='-') ? "-" : `${bDate} (${bType})`;
-
-                // Dynamic UI configuration for Notes row entry
-                let notesButtonHTML = "<span class='text-gray-500'>لا توجد ملاحظات</span>";
-                if(s.notes && s.notes.trim() !== "") {
-                    // Safe injection passing key pointers safely into event execution strings
-                    notesButtonHTML = `<button onclick="openNotesModal('${s.tag_id}')" class="bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/30 px-3 py-1 rounded-md text-xs font-semibold transition">👁️ عرض السجل المتكامل</button>`;
-                }
-
-                tr.innerHTML = `
-                    <td class="p-2.5 font-bold text-blue-400">${s.tag_id}</td>
-                    <td class="p-2.5">${nameTxt}</td>
-                    <td class="p-2.5"><span class="bg-gray-900 border border-gray-600 px-2 py-0.5 rounded text-xs">${breedTxt}</span></td>
-                    <td class="p-2.5">${birthTxt}</td>
-                    <td class="p-2.5 text-gray-400 text-xs">${purchaseCombined}</td>
-                    <td class="p-2.5 text-gray-400 text-xs">${breedingCombined}</td>
-                    <td class="p-2.5">${notesButtonHTML}</td>
-                    <td class="p-2.5 space-x-1 space-x-reverse whitespace-nowrap">
-                        <button onclick="startEdit('${s.tag_id}')" class="bg-yellow-600/80 hover:bg-yellow-600 text-white font-medium text-xs px-2.5 py-1 rounded transition">تعديل</button>
-                        <button onclick="deleteSheep('${s.tag_id}')" class="bg-red-600/80 hover:bg-red-600 text-white font-medium text-xs px-2.5 py-1 rounded transition">حذف</button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
+            let html = `<button data-breed="" class="breed-chip px-3 py-1 rounded-full text-xs font-medium border transition ${chipClass(!activeBreedFilter)}">الكل</button>`;
+            breeds.forEach(b => {
+                html += `<button data-breed="${escapeHtml(b)}" class="breed-chip px-3 py-1 rounded-full text-xs font-medium border transition ${chipClass(activeBreedFilter === b)}">${escapeHtml(b)}</button>`;
             });
+            container.innerHTML = html;
         }
 
-        // Modal Presentation Management Actions
+        function setBreedFilter(breed) {
+            activeBreedFilter = breed;
+            renderBreedFilters();
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const query = document.getElementById('searchBar').value.trim().toLowerCase();
+            let filtered = allSheep;
+
+            if (activeBreedFilter) {
+                filtered = filtered.filter(s => s.breed === activeBreedFilter);
+            }
+            if (query) {
+                filtered = filtered.filter(s => {
+                    const combined = `${s.tag_id} ${s.name} ${s.breed} ${s.birth_date} ${s.purchase_date} ${s.purchase_price} ${s.purchase_location} ${s.breeding_date} ${s.breeding_type} ${s.notes}`.toLowerCase();
+                    return combined.includes(query);
+                });
+            }
+
+            renderCards(filtered);
+        }
+
+        function hasPurchase(s) {
+            return !!(s.purchase_date || s.purchase_price || s.purchase_location);
+        }
+
+        function hasBreeding(s) {
+            return !!(s.breeding_date || s.breeding_type);
+        }
+
+        function hasNotes(s) {
+            return !!(s.notes && s.notes.trim());
+        }
+
+        function renderCards(data) {
+            const list = document.getElementById('sheepList');
+            const empty = document.getElementById('emptyState');
+            const resultsCount = document.getElementById('resultsCount');
+
+            if (allSheep.length === 0) {
+                list.innerHTML = '';
+                empty.classList.remove('hidden');
+                resultsCount.textContent = '';
+                return;
+            }
+
+            empty.classList.add('hidden');
+
+            const isFiltered = data.length !== allSheep.length || activeBreedFilter || document.getElementById('searchBar').value.trim();
+            resultsCount.textContent = isFiltered ? `عرض ${data.length} من ${allSheep.length}` : `${allSheep.length} رأس`;
+
+            if (data.length === 0) {
+                list.innerHTML = `<div class="text-center py-12 text-gray-500 text-sm">لا توجد نتائج مطابقة للبحث أو الفلتر</div>`;
+                return;
+            }
+
+            list.innerHTML = data.map(s => {
+                const safeTag = escapeHtml(s.tag_id);
+                const isExpanded = expandedCards.has(s.tag_id);
+                const name = s.name ? escapeHtml(s.name) : '<span class="text-gray-500">بدون اسم</span>';
+                const breed = s.breed
+                    ? `<span class="bg-gray-900 border border-gray-600 px-2 py-0.5 rounded text-xs text-gray-300">${escapeHtml(s.breed)}</span>`
+                    : '';
+
+                const chips = [];
+                if (hasPurchase(s)) chips.push('<span class="bg-emerald-900/40 border border-emerald-700/50 text-emerald-400 px-2 py-0.5 rounded text-xs">شراء</span>');
+                if (hasBreeding(s)) chips.push('<span class="bg-purple-900/40 border border-purple-700/50 text-purple-400 px-2 py-0.5 rounded text-xs">تلقيح</span>');
+                if (hasNotes(s)) chips.push('<span class="bg-amber-900/40 border border-amber-700/50 text-amber-400 px-2 py-0.5 rounded text-xs">ملاحظات</span>');
+                const chipsHtml = chips.length ? `<div class="flex flex-wrap gap-1.5 mt-2">${chips.join('')}</div>` : '';
+
+                const birthRow = s.birth_date
+                    ? `<div class="flex justify-between text-sm"><span class="text-gray-500">تاريخ الولادة</span><span>${escapeHtml(s.birth_date)}</span></div>`
+                    : '';
+
+                const purchaseRows = hasPurchase(s) ? `
+                    <div class="text-xs font-bold text-gray-500 mb-2 mt-1">بيانات الشراء</div>
+                    ${s.purchase_date ? `<div class="flex justify-between text-sm mb-1"><span class="text-gray-500">التاريخ</span><span>${escapeHtml(s.purchase_date)}</span></div>` : ''}
+                    ${s.purchase_price ? `<div class="flex justify-between text-sm mb-1"><span class="text-gray-500">السعر</span><span>${escapeHtml(s.purchase_price)}</span></div>` : ''}
+                    ${s.purchase_location ? `<div class="flex justify-between text-sm mb-1"><span class="text-gray-500">المكان</span><span>${escapeHtml(s.purchase_location)}</span></div>` : ''}
+                ` : `<div class="text-sm text-gray-500">لا توجد بيانات شراء</div>`;
+
+                const breedingRows = hasBreeding(s) ? `
+                    <div class="text-xs font-bold text-gray-500 mb-2 mt-1">بيانات التلقيح</div>
+                    ${s.breeding_date ? `<div class="flex justify-between text-sm mb-1"><span class="text-gray-500">التاريخ</span><span>${escapeHtml(s.breeding_date)}</span></div>` : ''}
+                    ${s.breeding_type ? `<div class="flex justify-between text-sm mb-1"><span class="text-gray-500">النوع</span><span>${escapeHtml(s.breeding_type)}</span></div>` : ''}
+                ` : `<div class="text-sm text-gray-500">لا توجد بيانات تلقيح</div>`;
+
+                const notesPreview = hasNotes(s)
+                    ? `<p class="text-sm text-gray-400 line-clamp-2 leading-relaxed mb-2">${escapeHtml(s.notes.slice(0, 120))}${s.notes.length > 120 ? '…' : ''}</p>
+                       <button data-action="notes" data-tag="${safeTag}" class="text-blue-400 hover:text-blue-300 text-xs font-semibold transition">عرض السجل الكامل ←</button>`
+                    : `<span class="text-sm text-gray-500">لا توجد ملاحظات</span>`;
+
+                return `
+                <div class="bg-gray-900/60 border border-gray-700 rounded-xl overflow-hidden" data-tag="${safeTag}">
+                    <div class="p-4 cursor-pointer select-none card-header">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex items-center gap-2 shrink-0">
+                                <button data-action="edit" data-tag="${safeTag}" title="تعديل" class="w-8 h-8 flex items-center justify-center rounded-lg bg-yellow-600/20 hover:bg-yellow-600/40 text-yellow-400 transition text-sm">✏️</button>
+                                <button data-action="delete" data-tag="${safeTag}" title="حذف" class="w-8 h-8 flex items-center justify-center rounded-lg bg-red-600/20 hover:bg-red-600/40 text-red-400 transition text-sm">🗑️</button>
+                                <span class="text-gray-500 text-xs transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}">▼</span>
+                            </div>
+                            <div class="flex-1 text-right min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap justify-end">
+                                    <span class="font-bold text-blue-400 text-base">${safeTag}</span>
+                                    ${breed}
+                                </div>
+                                <div class="text-gray-300 text-sm mt-0.5">${name}</div>
+                                ${chipsHtml}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-details overflow-hidden border-t border-gray-700/50 ${isExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}">
+                        <div class="p-4 space-y-4 bg-gray-800/40 text-right">
+                            ${birthRow}
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div class="bg-gray-800 rounded-lg p-3 border border-gray-700/50">${purchaseRows}</div>
+                                <div class="bg-gray-800 rounded-lg p-3 border border-gray-700/50">${breedingRows}</div>
+                            </div>
+                            <div class="bg-gray-800 rounded-lg p-3 border border-gray-700/50">
+                                <div class="text-xs font-bold text-gray-500 mb-2">الملاحظات والسجل</div>
+                                ${notesPreview}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function toggleCard(tagId) {
+            if (expandedCards.has(tagId)) {
+                expandedCards.delete(tagId);
+            } else {
+                expandedCards.add(tagId);
+            }
+            applyFilters();
+        }
+
         function openNotesModal(tagId) {
             const sheep = allSheep.find(s => s.tag_id === tagId);
             if (!sheep || !sheep.notes) return;
 
             document.getElementById('modalHeader').innerText = `سجل وملاحظات الخروف رقم (${tagId})`;
             document.getElementById('modalBody').innerText = sheep.notes;
-            
+
             const modal = document.getElementById('notesModal');
             modal.classList.remove('hidden');
             setTimeout(() => modal.classList.remove('opacity-0'), 10);
@@ -233,67 +443,86 @@
 
             document.getElementById('tag_id').value = sheep.tag_id;
             document.getElementById('tag_id').disabled = true;
-            document.getElementById('name').value = sheep.name;
-            document.getElementById('breed').value = sheep.breed;
-            document.getElementById('birth_date').value = sheep.birth_date;
-            document.getElementById('purchase_date').value = sheep.purchase_date;
+            document.getElementById('name').value = sheep.name || '';
+            document.getElementById('breed').value = sheep.breed || '';
+            document.getElementById('birth_date').value = sheep.birth_date || '';
+            document.getElementById('purchase_date').value = sheep.purchase_date || '';
             document.getElementById('purchase_price').value = sheep.purchase_price || '';
-            document.getElementById('purchase_location').value = sheep.purchase_location;
-            document.getElementById('breeding_date').value = sheep.breeding_date;
-            document.getElementById('breeding_type').value = sheep.breeding_type;
-            document.getElementById('notes').value = sheep.notes;
+            document.getElementById('purchase_location').value = sheep.purchase_location || '';
+            document.getElementById('breeding_date').value = sheep.breeding_date || '';
+            document.getElementById('breeding_type').value = sheep.breeding_type || '';
+            document.getElementById('notes').value = sheep.notes || '';
 
-            document.getElementById('formMode').value = "UPDATE";
-            document.getElementById('formTitle').innerText = `تعديل بيانات الخروف رقم (${tagId})`;
-            document.getElementById('formTitle').className = "text-xl font-bold mb-4 text-center border-b border-gray-700 pb-2 text-yellow-400";
-            document.getElementById('submitBtn').innerText = "تحديث البيانات المسجلة";
-            document.getElementById('submitBtn').className = "w-full bg-yellow-600 hover:bg-yellow-700 transition font-bold py-3 px-4 rounded-lg mt-2 text-white";
+            document.getElementById('formMode').value = 'UPDATE';
+            document.getElementById('formTitle').innerText = `تعديل الخروف (${tagId})`;
+            document.getElementById('formTitle').className = 'text-lg font-bold text-yellow-400';
+            document.getElementById('submitBtn').innerText = 'تحديث البيانات';
+            document.getElementById('submitBtn').className = 'w-full bg-yellow-600 hover:bg-yellow-700 transition font-bold py-3 px-4 rounded-lg text-white';
             document.getElementById('cancelBtn').classList.remove('hidden');
-            
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            openFormPanel();
         }
 
         function resetFormState() {
             document.getElementById('sheepForm').reset();
             document.getElementById('tag_id').disabled = false;
-            document.getElementById('formMode').value = "CREATE";
-            document.getElementById('formTitle').innerText = "تسجيل رأس جديد";
-            document.getElementById('formTitle').className = "text-xl font-bold mb-4 text-center border-b border-gray-700 pb-2 text-blue-400";
-            document.getElementById('submitBtn').innerText = "حفظ البيانات";
-            document.getElementById('submitBtn').className = "w-full bg-blue-600 hover:bg-blue-700 transition font-bold py-3 px-4 rounded-lg mt-2";
+            document.getElementById('formMode').value = 'CREATE';
+            document.getElementById('formTitle').innerText = 'تسجيل رأس جديد';
+            document.getElementById('formTitle').className = 'text-lg font-bold text-blue-400';
+            document.getElementById('submitBtn').innerText = 'حفظ البيانات';
+            document.getElementById('submitBtn').className = 'w-full bg-blue-600 hover:bg-blue-700 transition font-bold py-3 px-4 rounded-lg';
             document.getElementById('cancelBtn').classList.add('hidden');
         }
 
         async function deleteSheep(tagId) {
-            if (!confirm(`هل أنت متأكد تماماً من حذف الخروف رقم (${tagId}) بشكل نهائي من السجلات؟`)) return;
+            if (!confirm(`هل أنت متأكد من حذف الخروف رقم (${tagId}) نهائياً؟`)) return;
 
             try {
                 const response = await fetch(`/api/sheep/${tagId}`, { method: 'DELETE' });
                 const result = await response.json();
-                alert(result.message);
-                
-                if (document.getElementById('tag_id').value === tagId && document.getElementById('formMode').value === "UPDATE") {
+                showToast(result.message, result.success !== false ? 'success' : 'error');
+
+                if (document.getElementById('tag_id').value === tagId && document.getElementById('formMode').value === 'UPDATE') {
+                    closeFormPanel();
                     resetFormState();
                 }
+                expandedCards.delete(tagId);
                 fetchSheep();
-            } catch (err) { alert("تعذر تنفيذ عملية الحذف."); }
+            } catch (err) {
+                showToast('تعذر تنفيذ عملية الحذف', 'error');
+            }
         }
 
-        // The search entry continues to parse hidden notes content perfectly
-        document.getElementById('searchBar').addEventListener('input', (e) => {
-            const query = e.target.value.trim().toLowerCase();
-            const filtered = allSheep.filter(s => {
-                const combined = `${s.tag_id} ${s.name} ${s.breed} ${s.birth_date} ${s.purchase_date} ${s.purchase_price} ${s.purchase_location} ${s.breeding_date} ${s.breeding_type} ${s.notes}`.toLowerCase();
-                return combined.includes(query);
-            });
-            renderTable(filtered);
+        document.getElementById('breedFilters').addEventListener('click', (e) => {
+            const chip = e.target.closest('[data-breed]');
+            if (chip) setBreedFilter(chip.dataset.breed);
         });
+
+        document.getElementById('sheepList').addEventListener('click', (e) => {
+            const actionBtn = e.target.closest('[data-action]');
+            if (actionBtn) {
+                e.stopPropagation();
+                const tag = actionBtn.dataset.tag;
+                const action = actionBtn.dataset.action;
+                if (action === 'edit') startEdit(tag);
+                else if (action === 'delete') deleteSheep(tag);
+                else if (action === 'notes') openNotesModal(tag);
+                return;
+            }
+            const header = e.target.closest('.card-header');
+            if (header) {
+                const card = header.closest('[data-tag]');
+                if (card) toggleCard(card.dataset.tag);
+            }
+        });
+
+        document.getElementById('searchBar').addEventListener('input', applyFilters);
 
         document.getElementById('sheepForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const mode = document.getElementById('formMode').value;
             const tagId = document.getElementById('tag_id').value;
-            
+
             const payload = {
                 name: document.getElementById('name').value,
                 breed: document.getElementById('breed').value,
@@ -309,7 +538,7 @@
             let url = '/api/sheep';
             let method = 'POST';
 
-            if (mode === "UPDATE") {
+            if (mode === 'UPDATE') {
                 url = `/api/sheep/${tagId}`;
                 method = 'PUT';
             } else {
@@ -325,14 +554,17 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    alert(result.message);
+                    showToast(result.message, 'success');
+                    closeFormPanel();
                     resetFormState();
                     fetchSheep();
                     fetchBreeds();
                 } else {
-                    alert(result.message);
+                    showToast(result.message, 'error');
                 }
-            } catch (error) { alert("تعذر حفظ تعديلات البيانات."); }
+            } catch (error) {
+                showToast('تعذر حفظ البيانات', 'error');
+            }
         });
     </script>
 </body>
