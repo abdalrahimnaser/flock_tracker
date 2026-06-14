@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مُتابع القطيع v2.6</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans">
+
+    <div class="container mx-auto p-4 max-w-7xl">
+        <header class="text-center my-6">
+            <h1 class="text-3xl font-bold text-blue-400">مُتابع القطيع (FlockTracker)</h1>
+            <p class="text-gray-400 text-sm mt-1">إدارة شاملة مع خاصية التعديل والحذف</p>
+        </header>
+
+        <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
+            
+            <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 h-fit order-1 xl:order-2 xl:col-span-1">
+                <h2 id="formTitle" class="text-xl font-bold mb-4 text-center border-b border-gray-700 pb-2 text-blue-400">تسجيل رأس جديد</h2>
+                
+                <form id="sheepForm" class="space-y-4 text-right">
+                    <input type="hidden" id="formMode" value="CREATE">
+
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-gray-300">رقم الخروف *</label>
+                        <input type="text" id="tag_id" required class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-gray-300">اسم الخروف</label>
+                        <input type="text" id="name" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-gray-300">نوع / سلالة الخروف</label>
+                        <input type="text" id="breed" list="breedOptions" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500" placeholder="اكتب أو اختر...">
+                        <datalist id="breedOptions">
+                            <option value="دروبر">
+                            <option value="سفلك">
+                            <option value="عساف">
+                            <option value="بلدي">
+                        </datalist>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-gray-300">تاريخ الولادة</label>
+                        <input type="date" id="birth_date" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500 text-right">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-gray-300">تاريخ الشراء</label>
+                        <input type="date" id="purchase_date" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500 text-right">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-gray-300">سعر الشراء</label>
+                        <input type="number" step="0.01" id="purchase_price" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-gray-300">مكان الشراء</label>
+                        <input type="text" id="purchase_location" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="p-3 bg-gray-700/30 rounded-lg border border-gray-700 space-y-3">
+                        <span class="block text-xs font-bold text-blue-400 uppercase tracking-wide">بيانات التلقيح</span>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-gray-400">تاريخ التلقيح</label>
+                            <input type="date" id="breeding_date" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500 text-right">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-gray-400">نوع التلقيح</label>
+                            <select id="breeding_type" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">غير محدد</option>
+                                <option value="طبيعي">طبيعي</option>
+                                <option value="صناعي">صناعي</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-gray-300">ملاحظات عامة</label>
+                        <textarea id="notes" rows="2" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+                    </div>
+
+                    <button type="submit" id="submitBtn" class="w-full bg-blue-600 hover:bg-blue-700 transition font-bold py-3 px-4 rounded-lg mt-2">
+                        حفظ البيانات
+                    </button>
+                    
+                    <button type="button" id="cancelBtn" onclick="resetFormState()" class="w-full bg-gray-700 hover:bg-gray-600 transition font-medium py-2 px-4 rounded-lg hidden">
+                        إلغاء التعديل
+                    </button>
+                </form>
+            </div>
+
+            <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 order-2 lg:order-1 xl:col-span-3 flex flex-col">
+                <h2 class="text-xl font-bold mb-4 text-center lg:text-right">سجل البيانات الحالي</h2>
+                
+                <div class="mb-4">
+                    <input type="text" id="searchBar" placeholder="🔍 ابحث هنا بـ أي معلومة لتصفية الجدول فورا..." class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                </div>
+
+                <div class="overflow-x-auto rounded-lg border border-gray-700">
+                    <table class="w-full text-center border-collapse text-xs md:text-sm min-w-[1050px]">
+                        <thead class="bg-blue-900/60 text-blue-300 font-bold border-b border-gray-700">
+                            <tr>
+                                <th class="p-2.5">رقم الخروف</th>
+                                <th class="p-2.5">الاسم</th>
+                                <th class="p-2.5">النوع/السلالة</th>
+                                <th class="p-2.5">تاريخ الولادة</th>
+                                <th class="p-2.5">شراء (التاريخ / السعر / المكان)</th>
+                                <th class="p-2.5">التلقيح (التاريخ / النوع)</th>
+                                <th class="p-2.5">الملاحظات</th>
+                                <th class="p-2.5">خيارات الإدارة</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sheepTableBody" class="divide-y divide-gray-700">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        let allSheep = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchSheep();
+            fetchBreeds();
+        });
+
+        async function fetchBreeds() {
+            try {
+                const response = await fetch('/api/breeds');
+                const cloudBreeds = await response.json();
+                const datalist = document.getElementById('breedOptions');
+                const defaults = ["دروبر", "سفلك", "عساف", "بلدي"];
+                
+                cloudBreeds.forEach(b => {
+                    if(!defaults.includes(b)) {
+                        const opt = document.createElement('option');
+                        opt.value = b;
+                        datalist.appendChild(opt);
+                    }
+                });
+            } catch (err) { console.error(err); }
+        }
+
+        async function fetchSheep() {
+            try {
+                const response = await fetch('/api/sheep');
+                allSheep = await response.json();
+                renderTable(allSheep);
+            } catch (error) { console.error(error); }
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('sheepTableBody');
+            tbody.innerHTML = '';
+
+            data.forEach(s => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-700/50 transition text-gray-200";
+                
+                const nameTxt = s.name || "<span class='text-gray-500'>-</span>";
+                const breedTxt = s.breed || "<span class='text-gray-500'>-</span>";
+                const birthTxt = s.birth_date || "<span class='text-gray-500'>-</span>";
+                
+                const pDate = s.purchase_date || "-";
+                const pPrice = s.purchase_price ? `${s.purchase_price}` : "-";
+                const pLoc = s.purchase_location || "-";
+                const purchaseCombined = (pDate==='-' && pPrice==='-' && pLoc==='-') ? "-" : `${pDate} / ${pPrice} / ${pLoc}`;
+
+                const bDate = s.breeding_date || "-";
+                const bType = s.breeding_type || "-";
+                const breedingCombined = (bDate==='-' && bType==='-') ? "-" : `${bDate} (${bType})`;
+                
+                const notesTxt = s.notes ? `<div class='max-w-xs overflow-hidden text-ellipsis whitespace-nowrap' title='${s.notes}'>${s.notes}</div>` : "<span class='text-gray-500'>-</span>";
+
+                tr.innerHTML = `
+                    <td class="p-2.5 font-bold text-blue-400">${s.tag_id}</td>
+                    <td class="p-2.5">${nameTxt}</td>
+                    <td class="p-2.5"><span class="bg-gray-900 border border-gray-600 px-2 py-0.5 rounded text-xs">${breedTxt}</span></td>
+                    <td class="p-2.5">${birthTxt}</td>
+                    <td class="p-2.5 text-gray-400 text-xs">${purchaseCombined}</td>
+                    <td class="p-2.5 text-gray-400 text-xs">${breedingCombined}</td>
+                    <td class="p-2.5 text-right text-xs text-gray-400">${notesTxt}</td>
+                    <td class="p-2.5 space-x-1 space-x-reverse whitespace-nowrap">
+                        <button onclick="startEdit('${s.tag_id}')" class="bg-yellow-600/80 hover:bg-yellow-600 text-white font-medium text-xs px-2.5 py-1 rounded transition">تعديل</button>
+                        <button onclick="deleteSheep('${s.tag_id}')" class="bg-red-600/80 hover:bg-red-600 text-white font-medium text-xs px-2.5 py-1 rounded transition">حذف</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Triggered when clicking 'Edit' row action button
+        function startEdit(tagId) {
+            const sheep = allSheep.find(s => s.tag_id === tagId);
+            if (!sheep) return;
+
+            // Load data objects into the interface fields directly
+            document.getElementById('tag_id').value = sheep.tag_id;
+            document.getElementById('tag_id').disabled = true; // Lock tag_id during modification updates
+            document.getElementById('name').value = sheep.name;
+            document.getElementById('breed').value = sheep.breed;
+            document.getElementById('birth_date').value = sheep.birth_date;
+            document.getElementById('purchase_date').value = sheep.purchase_date;
+            document.getElementById('purchase_price').value = sheep.purchase_price || '';
+            document.getElementById('purchase_location').value = sheep.purchase_location;
+            document.getElementById('breeding_date').value = sheep.breeding_date;
+            document.getElementById('breeding_type').value = sheep.breeding_type;
+            document.getElementById('notes').value = sheep.notes;
+
+            // Shift form headers and buttons into visual Update layout configuration
+            document.getElementById('formMode').value = "UPDATE";
+            document.getElementById('formTitle').innerText = `تعديل بيانات الخروف رقم (${tagId})`;
+            document.getElementById('formTitle').className = "text-xl font-bold mb-4 text-center border-b border-gray-700 pb-2 text-yellow-400";
+            document.getElementById('submitBtn').innerText = "تحديث البيانات المسجلة";
+            document.getElementById('submitBtn').className = "w-full bg-yellow-600 hover:bg-yellow-700 transition font-bold py-3 px-4 rounded-lg mt-2 text-white";
+            document.getElementById('cancelBtn').classList.remove('hidden');
+            
+            // Auto scroll form context up to top view focus window context for mobile handsets
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function resetFormState() {
+            document.getElementById('sheepForm').reset();
+            document.getElementById('tag_id').disabled = false; // Release input lock toggle
+            document.getElementById('formMode').value = "CREATE";
+            document.getElementById('formTitle').innerText = "تسجيل رأس جديد";
+            document.getElementById('formTitle').className = "text-xl font-bold mb-4 text-center border-b border-gray-700 pb-2 text-blue-400";
+            document.getElementById('submitBtn').innerText = "حفظ البيانات";
+            document.getElementById('submitBtn').className = "w-full bg-blue-600 hover:bg-blue-700 transition font-bold py-3 px-4 rounded-lg mt-2";
+            document.getElementById('cancelBtn').classList.add('hidden');
+        }
+
+        async function deleteSheep(tagId) {
+            if (!confirm(`هل أنت متأكد تماماً من حذف الخروف رقم (${tagId}) بشكل نهائي من السجلات؟`)) return;
+
+            try {
+                const response = await fetch(`/api/sheep/${tagId}`, { method: 'DELETE' });
+                const result = await response.json();
+                alert(result.message);
+                
+                // If deleting the sheep currently loaded into edit state, clear the form out safely
+                if (document.getElementById('tag_id').value === tagId && document.getElementById('formMode').value === "UPDATE") {
+                    resetFormState();
+                }
+                fetchSheep();
+            } catch (err) { alert("تعذر تنفيذ عملية الحذف."); }
+        }
+
+        // Global Dynamic Search Key Handler
+        document.getElementById('searchBar').addEventListener('input', (e) => {
+            const query = e.target.value.trim().toLowerCase();
+            const filtered = allSheep.filter(s => {
+                const combined = `${s.tag_id} ${s.name} ${s.breed} ${s.birth_date} ${s.purchase_date} ${s.purchase_price} ${s.purchase_location} ${s.breeding_date} ${s.breeding_type} ${s.notes}`.toLowerCase();
+                return combined.includes(query);
+            });
+            renderTable(filtered);
+        });
+
+        // Combined Form Handling Router Pipeline intercepts
+        document.getElementById('sheepForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const mode = document.getElementById('formMode').value;
+            const tagId = document.getElementById('tag_id').value;
+            
+            const payload = {
+                name: document.getElementById('name').value,
+                breed: document.getElementById('breed').value,
+                birth_date: document.getElementById('birth_date').value,
+                purchase_date: document.getElementById('purchase_date').value,
+                purchase_price: document.getElementById('purchase_price').value,
+                purchase_location: document.getElementById('purchase_location').value,
+                breeding_date: document.getElementById('breeding_date').value,
+                breeding_type: document.getElementById('breeding_type').value,
+                notes: document.getElementById('notes').value
+            };
+
+            let url = '/api/sheep';
+            let method = 'POST';
+
+            if (mode === "UPDATE") {
+                url = `/api/sheep/${tagId}`;
+                method = 'PUT';
+            } else {
+                payload.tag_id = tagId; // Only pass primary key during creation scripts
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(result.message);
+                    resetFormState();
+                    fetchSheep();
+                    fetchBreeds();
+                } else {
+                    alert(result.message);
+                }
+            } catch (error) { alert("تعذر حفظ تعديلات البيانات."); }
+        });
+    </script>
+</body>
+</html>
