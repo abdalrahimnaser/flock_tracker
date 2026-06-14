@@ -6,7 +6,6 @@
     <title>مُتابع القطيع v3.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: linear-gradient(165deg, #fafaf9 0%, #f5f5f4 50%, #fefce8 100%); }
         #formPanel { transition: transform 0.3s ease; }
         #formBackdrop { transition: opacity 0.3s ease; }
         .card-details { transition: max-height 0.25s ease, opacity 0.2s ease; }
@@ -22,39 +21,39 @@
         }
     </style>
 </head>
-<body class="text-stone-800 min-h-screen font-sans relative pb-24">
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans relative pb-24">
 
     <div class="container mx-auto p-4 max-w-5xl">
         <header class="my-6">
             <div class="text-center mb-5">
-                <h1 class="text-3xl font-bold text-lime-700">مُتابع القطيع (FlockTracker)</h1>
-                <p class="text-stone-500 text-sm mt-1">إدارة القطيع — عرض بطاقات وتفاصيل موسّعة</p>
+                <h1 class="text-3xl font-bold text-blue-400">مُتابع القطيع (FlockTracker)</h1>
+                <p class="text-gray-400 text-sm mt-1">إدارة القطيع — عرض بطاقات وتفاصيل موسّعة</p>
             </div>
             <div id="statsBar" class="grid grid-cols-3 gap-3 text-center">
-                <div class="bg-white border border-stone-200 rounded-xl p-3 shadow-sm">
-                    <div id="statTotal" class="text-2xl font-bold text-lime-700">0</div>
-                    <div class="text-xs text-stone-500 mt-0.5">إجمالي القطيع</div>
+                <div class="bg-gray-800 border border-gray-700 rounded-xl p-3">
+                    <div id="statTotal" class="text-2xl font-bold text-blue-400">0</div>
+                    <div class="text-xs text-gray-400 mt-0.5">إجمالي القطيع</div>
                 </div>
-                <div class="bg-white border border-stone-200 rounded-xl p-3 shadow-sm">
-                    <div id="statBreeds" class="text-2xl font-bold text-amber-600">0</div>
-                    <div class="text-xs text-stone-500 mt-0.5">سلالات</div>
+                <div class="bg-gray-800 border border-gray-700 rounded-xl p-3">
+                    <div id="statBreeds" class="text-2xl font-bold text-emerald-400">0</div>
+                    <div class="text-xs text-gray-400 mt-0.5">سلالات</div>
                 </div>
-                <div class="bg-white border border-stone-200 rounded-xl p-3 shadow-sm">
-                    <div id="statNotes" class="text-2xl font-bold text-orange-600">0</div>
-                    <div class="text-xs text-stone-500 mt-0.5">لديهم ملاحظات</div>
+                <div class="bg-gray-800 border border-gray-700 rounded-xl p-3">
+                    <div id="statNotes" class="text-2xl font-bold text-amber-400">0</div>
+                    <div class="text-xs text-gray-400 mt-0.5">لديهم ملاحظات</div>
                 </div>
             </div>
         </header>
 
-        <main class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-stone-200">
+        <main class="bg-gray-800 p-4 sm:p-6 rounded-xl shadow-lg border border-gray-700">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <h2 class="text-lg font-bold text-right">سجل القطيع</h2>
-                <p id="resultsCount" class="text-xs text-stone-500 text-right"></p>
+                <p id="resultsCount" class="text-xs text-gray-500 text-right"></p>
             </div>
 
             <div class="mb-3">
                 <input type="text" id="searchBar" placeholder="ابحث برقم الخروف، الاسم، السلالة، أو الملاحظات..."
-                    class="w-full bg-stone-50 border border-stone-300 rounded-lg p-3 text-stone-900 focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500 outline-none text-sm">
+                    class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm">
             </div>
 
             <div id="breedFilters" class="flex flex-wrap gap-2 mb-5"></div>
@@ -63,8 +62,8 @@
 
             <div id="emptyState" class="hidden text-center py-16 px-4">
                 <div class="text-5xl mb-4 opacity-40">🐑</div>
-                <p class="text-stone-500 text-sm mb-4">لا توجد سجلات بعد — ابدأ بإضافة أول رأس في القطيع</p>
-                <button onclick="openFormPanel(true)" class="bg-lime-600 hover:bg-lime-700 transition font-semibold py-2.5 px-6 rounded-lg text-sm text-white">
+                <p class="text-gray-400 text-sm mb-4">لا توجد سجلات بعد — ابدأ بإضافة أول رأس في القطيع</p>
+                <button onclick="openFormPanel(true)" class="bg-blue-600 hover:bg-blue-700 transition font-semibold py-2.5 px-6 rounded-lg text-sm">
                     + تسجيل رأس جديد
                 </button>
             </div>
@@ -73,35 +72,35 @@
 
     <!-- Floating add button -->
     <button id="fabAdd" onclick="openFormPanel(true)"
-        class="fixed bottom-6 left-6 z-30 bg-lime-600 hover:bg-lime-700 text-white w-14 h-14 rounded-full shadow-lg shadow-stone-300/60 flex items-center justify-center text-2xl font-light transition hover:scale-105 active:scale-95"
+        class="fixed bottom-6 left-6 z-30 bg-blue-600 hover:bg-blue-500 text-white w-14 h-14 rounded-full shadow-lg shadow-blue-900/50 flex items-center justify-center text-2xl font-light transition hover:scale-105 active:scale-95"
         title="تسجيل رأس جديد" aria-label="تسجيل رأس جديد">+</button>
 
     <!-- Form slide-over backdrop -->
     <div id="formBackdrop" onclick="closeFormPanel()"
-        class="fixed inset-0 bg-stone-900/30 backdrop-blur-sm z-40 hidden opacity-0"></div>
+        class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden opacity-0"></div>
 
     <!-- Form slide-over panel -->
     <div id="formPanel"
-        class="fixed top-0 right-0 h-full w-full max-w-md bg-white border-l border-stone-200 z-50 flex flex-col translate-x-full shadow-2xl">
-        <div class="flex items-center justify-between p-5 border-b border-stone-200 shrink-0">
-            <button onclick="closeFormPanel()" class="text-stone-400 hover:text-stone-700 text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-stone-100 transition" aria-label="إغلاق">&times;</button>
-            <h2 id="formTitle" class="text-lg font-bold text-lime-700">تسجيل رأس جديد</h2>
+        class="fixed top-0 right-0 h-full w-full max-w-md bg-gray-800 border-l border-gray-700 z-50 flex flex-col translate-x-full shadow-2xl">
+        <div class="flex items-center justify-between p-5 border-b border-gray-700 shrink-0">
+            <button onclick="closeFormPanel()" class="text-gray-400 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-700 transition" aria-label="إغلاق">&times;</button>
+            <h2 id="formTitle" class="text-lg font-bold text-blue-400">تسجيل رأس جديد</h2>
         </div>
         <div class="overflow-y-auto flex-1 p-5">
             <form id="sheepForm" class="space-y-4 text-right">
                 <input type="hidden" id="formMode" value="CREATE">
 
                 <div>
-                    <label class="block text-sm font-medium mb-1 text-stone-700">رقم الخروف *</label>
-                    <input type="text" id="tag_id" required class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500 disabled:opacity-50">
+                    <label class="block text-sm font-medium mb-1 text-gray-300">رقم الخروف *</label>
+                    <input type="text" id="tag_id" required class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-1 text-stone-700">اسم الخروف</label>
-                    <input type="text" id="name" class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                    <label class="block text-sm font-medium mb-1 text-gray-300">اسم الخروف</label>
+                    <input type="text" id="name" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-1 text-stone-700">نوع / سلالة الخروف</label>
-                    <input type="text" id="breed" list="breedOptions" class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500" placeholder="اكتب أو اختر...">
+                    <label class="block text-sm font-medium mb-1 text-gray-300">نوع / سلالة الخروف</label>
+                    <input type="text" id="breed" list="breedOptions" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500" placeholder="اكتب أو اختر...">
                     <datalist id="breedOptions">
                         <option value="دروبر">
                         <option value="سفلك">
@@ -110,33 +109,33 @@
                     </datalist>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-1 text-stone-700">تاريخ الولادة</label>
-                    <input type="date" id="birth_date" class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                    <label class="block text-sm font-medium mb-1 text-gray-300">تاريخ الولادة</label>
+                    <input type="date" id="birth_date" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
-                <div class="p-3 bg-stone-50 rounded-lg border border-stone-200 space-y-3">
-                    <span class="block text-xs font-bold text-stone-500">بيانات الشراء</span>
+                <div class="p-3 bg-gray-700/30 rounded-lg border border-gray-700 space-y-3">
+                    <span class="block text-xs font-bold text-gray-400">بيانات الشراء</span>
                     <div>
-                        <label class="block text-xs font-medium mb-1 text-stone-500">تاريخ الشراء</label>
-                        <input type="date" id="purchase_date" class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                        <label class="block text-xs font-medium mb-1 text-gray-400">تاريخ الشراء</label>
+                        <input type="date" id="purchase_date" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium mb-1 text-stone-500">سعر الشراء</label>
-                        <input type="number" step="0.01" id="purchase_price" class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                        <label class="block text-xs font-medium mb-1 text-gray-400">سعر الشراء</label>
+                        <input type="number" step="0.01" id="purchase_price" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium mb-1 text-stone-500">مكان الشراء</label>
-                        <input type="text" id="purchase_location" class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                        <label class="block text-xs font-medium mb-1 text-gray-400">مكان الشراء</label>
+                        <input type="text" id="purchase_location" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                 </div>
-                <div class="p-3 bg-stone-50 rounded-lg border border-stone-200 space-y-3">
-                    <span class="block text-xs font-bold text-amber-600">بيانات التلقيح</span>
+                <div class="p-3 bg-gray-700/30 rounded-lg border border-gray-700 space-y-3">
+                    <span class="block text-xs font-bold text-blue-400">بيانات التلقيح</span>
                     <div>
-                        <label class="block text-xs font-medium mb-1 text-stone-500">تاريخ التلقيح</label>
-                        <input type="date" id="breeding_date" class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                        <label class="block text-xs font-medium mb-1 text-gray-400">تاريخ التلقيح</label>
+                        <input type="date" id="breeding_date" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium mb-1 text-stone-500">نوع التلقيح</label>
-                        <select id="breeding_type" class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                        <label class="block text-xs font-medium mb-1 text-gray-400">نوع التلقيح</label>
+                        <select id="breeding_type" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="">غير محدد</option>
                             <option value="طبيعي">طبيعي</option>
                             <option value="صناعي">صناعي</option>
@@ -144,31 +143,31 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-1 text-stone-700">ملاحظات عامة / سجلات علاجية</label>
-                    <textarea id="notes" rows="4" placeholder="أدخل الملاحظات واليوميات هنا..." class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500 text-sm resize-none"></textarea>
+                    <label class="block text-sm font-medium mb-1 text-gray-300">ملاحظات عامة / سجلات علاجية</label>
+                    <textarea id="notes" rows="4" placeholder="أدخل الملاحظات واليوميات هنا..." class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none"></textarea>
                 </div>
             </form>
         </div>
-        <div class="p-5 border-t border-stone-200 shrink-0 space-y-2 bg-white">
-            <button type="submit" form="sheepForm" id="submitBtn" class="w-full bg-lime-600 hover:bg-lime-700 transition font-bold py-3 px-4 rounded-lg text-white">
+        <div class="p-5 border-t border-gray-700 shrink-0 space-y-2 bg-gray-800/95">
+            <button type="submit" form="sheepForm" id="submitBtn" class="w-full bg-blue-600 hover:bg-blue-700 transition font-bold py-3 px-4 rounded-lg">
                 حفظ البيانات
             </button>
-            <button type="button" id="cancelBtn" onclick="closeFormPanel(); resetFormState();" class="w-full bg-stone-100 hover:bg-stone-200 text-stone-700 transition font-medium py-2 px-4 rounded-lg hidden">
+            <button type="button" id="cancelBtn" onclick="closeFormPanel(); resetFormState();" class="w-full bg-gray-700 hover:bg-gray-600 transition font-medium py-2 px-4 rounded-lg hidden">
                 إلغاء
             </button>
         </div>
     </div>
 
     <!-- Notes modal -->
-    <div id="notesModal" class="fixed inset-0 bg-stone-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300" onclick="closeNotesModal()">
-        <div class="bg-white border border-stone-200 w-full max-w-lg p-6 rounded-xl shadow-2xl relative mx-4 text-right flex flex-col max-h-[80vh]" onclick="event.stopPropagation()">
-            <div class="flex items-center justify-between border-b border-stone-200 pb-3 mb-4">
-                <button onclick="closeNotesModal()" class="text-stone-400 hover:text-stone-700 font-bold text-lg">&times;</button>
-                <h3 id="modalHeader" class="text-lg font-bold text-lime-700">سجل ملاحظات الخروف</h3>
+    <div id="notesModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300" onclick="closeNotesModal()">
+        <div class="bg-gray-800 border border-gray-700 w-full max-w-lg p-6 rounded-xl shadow-2xl relative mx-4 text-right flex flex-col max-h-[80vh]" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between border-b border-gray-700 pb-3 mb-4">
+                <button onclick="closeNotesModal()" class="text-gray-400 hover:text-white font-bold text-lg">&times;</button>
+                <h3 id="modalHeader" class="text-lg font-bold text-blue-400">سجل ملاحظات الخروف</h3>
             </div>
-            <div id="modalBody" class="text-sm text-stone-700 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed bg-stone-50 p-4 rounded-lg border border-stone-200 flex-1"></div>
-            <div class="mt-4 pt-2 border-t border-stone-200 flex justify-end">
-                <button onclick="closeNotesModal()" class="bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold px-4 py-2 rounded-lg transition">إغلاق</button>
+            <div id="modalBody" class="text-sm text-gray-300 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed bg-gray-900/40 p-4 rounded-lg border border-gray-700/50 flex-1"></div>
+            <div class="mt-4 pt-2 border-t border-gray-700 flex justify-end">
+                <button onclick="closeNotesModal()" class="bg-gray-700 hover:bg-gray-600 text-white text-xs font-semibold px-4 py-2 rounded-lg transition">إغلاق</button>
             </div>
         </div>
     </div>
@@ -200,9 +199,9 @@
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
             const colors = {
-                success: 'bg-lime-50 border-lime-300 text-lime-800',
-                error:   'bg-red-50 border-red-200 text-red-800',
-                info:    'bg-stone-100 border-stone-300 text-stone-800'
+                success: 'bg-emerald-800 border-emerald-600 text-emerald-100',
+                error:   'bg-red-900 border-red-700 text-red-100',
+                info:    'bg-gray-700 border-gray-600 text-gray-100'
             };
             toast.className = `pointer-events-auto toast-enter px-4 py-3 rounded-lg border text-sm font-medium shadow-lg text-center w-full ${colors[type] || colors.info}`;
             toast.textContent = message;
@@ -272,8 +271,8 @@
             const container = document.getElementById('breedFilters');
             const breeds = [...new Set(allSheep.map(s => s.breed).filter(Boolean))].sort();
             const chipClass = (active) => active
-                ? 'bg-lime-600 border-lime-600 text-white'
-                : 'bg-white border-stone-300 text-stone-600 hover:bg-stone-50';
+                ? 'bg-blue-600 border-blue-500 text-white'
+                : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600';
 
             let html = `<button data-breed="" class="breed-chip px-3 py-1 rounded-full text-xs font-medium border transition ${chipClass(!activeBreedFilter)}">الكل</button>`;
             breeds.forEach(b => {
@@ -335,72 +334,74 @@
             resultsCount.textContent = isFiltered ? `عرض ${data.length} من ${allSheep.length}` : `${allSheep.length} رأس`;
 
             if (data.length === 0) {
-                list.innerHTML = `<div class="text-center py-12 text-stone-500 text-sm">لا توجد نتائج مطابقة للبحث أو الفلتر</div>`;
+                list.innerHTML = `<div class="text-center py-12 text-gray-500 text-sm">لا توجد نتائج مطابقة للبحث أو الفلتر</div>`;
                 return;
             }
 
             list.innerHTML = data.map(s => {
                 const safeTag = escapeHtml(s.tag_id);
                 const isExpanded = expandedCards.has(s.tag_id);
-                const nameHtml = s.name ? `<div class="text-stone-500 text-sm mt-0.5">${escapeHtml(s.name)}</div>` : '';
+                const name = s.name ? escapeHtml(s.name) : '<span class="text-gray-500">بدون اسم</span>';
                 const breed = s.breed
-                    ? `<span class="text-base text-lime-700">${escapeHtml(s.breed)}</span>`
-                    : '<span class="text-sm text-stone-500">بدون سلالة</span>';
+                    ? `<span class="bg-gray-900 border border-gray-600 px-2 py-0.5 rounded text-xs text-gray-300">${escapeHtml(s.breed)}</span>`
+                    : '';
+
+                const chips = [];
+                if (hasPurchase(s)) chips.push('<span class="bg-emerald-900/40 border border-emerald-700/50 text-emerald-400 px-2 py-0.5 rounded text-xs">شراء</span>');
+                if (hasBreeding(s)) chips.push('<span class="bg-purple-900/40 border border-purple-700/50 text-purple-400 px-2 py-0.5 rounded text-xs">تلقيح</span>');
+                if (hasNotes(s)) chips.push('<span class="bg-amber-900/40 border border-amber-700/50 text-amber-400 px-2 py-0.5 rounded text-xs">ملاحظات</span>');
+                const chipsHtml = chips.length ? `<div class="flex flex-wrap gap-1.5 mt-2">${chips.join('')}</div>` : '';
 
                 const birthRow = s.birth_date
-                    ? `<div class="flex justify-between text-sm"><span class="text-stone-500">تاريخ الولادة</span><span>${escapeHtml(s.birth_date)}</span></div>`
+                    ? `<div class="flex justify-between text-sm"><span class="text-gray-500">تاريخ الولادة</span><span>${escapeHtml(s.birth_date)}</span></div>`
                     : '';
 
                 const purchaseRows = hasPurchase(s) ? `
-                    <div class="text-xs font-bold text-stone-500 mb-2 mt-1">بيانات الشراء</div>
-                    ${s.purchase_date ? `<div class="flex justify-between text-sm mb-1"><span class="text-stone-500">التاريخ</span><span>${escapeHtml(s.purchase_date)}</span></div>` : ''}
-                    ${s.purchase_price ? `<div class="flex justify-between text-sm mb-1"><span class="text-stone-500">السعر</span><span>${escapeHtml(s.purchase_price)}</span></div>` : ''}
-                    ${s.purchase_location ? `<div class="flex justify-between text-sm mb-1"><span class="text-stone-500">المكان</span><span>${escapeHtml(s.purchase_location)}</span></div>` : ''}
-                ` : `<div class="text-sm text-stone-500">لا توجد بيانات شراء</div>`;
+                    <div class="text-xs font-bold text-gray-500 mb-2 mt-1">بيانات الشراء</div>
+                    ${s.purchase_date ? `<div class="flex justify-between text-sm mb-1"><span class="text-gray-500">التاريخ</span><span>${escapeHtml(s.purchase_date)}</span></div>` : ''}
+                    ${s.purchase_price ? `<div class="flex justify-between text-sm mb-1"><span class="text-gray-500">السعر</span><span>${escapeHtml(s.purchase_price)}</span></div>` : ''}
+                    ${s.purchase_location ? `<div class="flex justify-between text-sm mb-1"><span class="text-gray-500">المكان</span><span>${escapeHtml(s.purchase_location)}</span></div>` : ''}
+                ` : `<div class="text-sm text-gray-500">لا توجد بيانات شراء</div>`;
 
                 const breedingRows = hasBreeding(s) ? `
-                    <div class="text-xs font-bold text-stone-500 mb-2 mt-1">بيانات التلقيح</div>
-                    ${s.breeding_date ? `<div class="flex justify-between text-sm mb-1"><span class="text-stone-500">التاريخ</span><span>${escapeHtml(s.breeding_date)}</span></div>` : ''}
-                    ${s.breeding_type ? `<div class="flex justify-between text-sm mb-1"><span class="text-stone-500">النوع</span><span>${escapeHtml(s.breeding_type)}</span></div>` : ''}
-                ` : `<div class="text-sm text-stone-500">لا توجد بيانات تلقيح</div>`;
+                    <div class="text-xs font-bold text-gray-500 mb-2 mt-1">بيانات التلقيح</div>
+                    ${s.breeding_date ? `<div class="flex justify-between text-sm mb-1"><span class="text-gray-500">التاريخ</span><span>${escapeHtml(s.breeding_date)}</span></div>` : ''}
+                    ${s.breeding_type ? `<div class="flex justify-between text-sm mb-1"><span class="text-gray-500">النوع</span><span>${escapeHtml(s.breeding_type)}</span></div>` : ''}
+                ` : `<div class="text-sm text-gray-500">لا توجد بيانات تلقيح</div>`;
 
                 const notesPreview = hasNotes(s)
-                    ? `<p class="text-sm text-stone-600 line-clamp-2 leading-relaxed mb-2">${escapeHtml(s.notes.slice(0, 120))}${s.notes.length > 120 ? '…' : ''}</p>
-                       <button data-action="notes" data-tag="${safeTag}" class="text-lime-700 hover:text-lime-800 text-xs font-semibold transition">عرض السجل الكامل ←</button>`
-                    : `<span class="text-sm text-stone-500">لا توجد ملاحظات</span>`;
+                    ? `<p class="text-sm text-gray-400 line-clamp-2 leading-relaxed mb-2">${escapeHtml(s.notes.slice(0, 120))}${s.notes.length > 120 ? '…' : ''}</p>
+                       <button data-action="notes" data-tag="${safeTag}" class="text-blue-400 hover:text-blue-300 text-xs font-semibold transition">عرض السجل الكامل ←</button>`
+                    : `<span class="text-sm text-gray-500">لا توجد ملاحظات</span>`;
 
                 return `
-                <div class="border border-stone-200 rounded-lg overflow-hidden bg-white" data-tag="${safeTag}">
-                    <div class="px-3 py-3 cursor-pointer select-none card-header">
-                        <div class="flex items-center justify-between gap-4" dir="ltr">
-                            <div class="flex items-center gap-0.5 shrink-0">
-                                <button data-action="edit" data-tag="${safeTag}" title="تعديل" class="p-2 rounded-md text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition" aria-label="تعديل">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path stroke-linecap="round" stroke-linejoin="round" d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                </button>
-                                <button data-action="delete" data-tag="${safeTag}" title="حذف" class="p-2 rounded-md text-stone-400 hover:text-red-600 hover:bg-red-50 transition" aria-label="حذف">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                                </button>
-                                <span class="p-2 text-stone-400 text-xs transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}">▼</span>
+                <div class="bg-gray-900/60 border border-gray-700 rounded-xl overflow-hidden" data-tag="${safeTag}">
+                    <div class="p-4 cursor-pointer select-none card-header">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex items-center gap-2 shrink-0">
+                                <button data-action="edit" data-tag="${safeTag}" title="تعديل" class="w-8 h-8 flex items-center justify-center rounded-lg bg-yellow-600/20 hover:bg-yellow-600/40 text-yellow-400 transition text-sm">✏️</button>
+                                <button data-action="delete" data-tag="${safeTag}" title="حذف" class="w-8 h-8 flex items-center justify-center rounded-lg bg-red-600/20 hover:bg-red-600/40 text-red-400 transition text-sm">🗑️</button>
+                                <span class="text-gray-500 text-xs transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}">▼</span>
                             </div>
-                            <div class="flex-1 min-w-0 text-right" dir="rtl">
-                                <div class="flex items-baseline gap-2 flex-wrap justify-start">
-                                    <span class="text-xl font-semibold text-stone-900">${safeTag}</span>
-                                    <span class="text-stone-300">·</span>
+                            <div class="flex-1 text-right min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap justify-end">
+                                    <span class="font-bold text-blue-400 text-base">${safeTag}</span>
                                     ${breed}
                                 </div>
-                                ${nameHtml}
+                                <div class="text-gray-300 text-sm mt-0.5">${name}</div>
+                                ${chipsHtml}
                             </div>
                         </div>
                     </div>
-                    <div class="card-details overflow-hidden border-t border-stone-200 ${isExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}">
-                        <div class="p-4 space-y-4 bg-stone-50 text-right">
+                    <div class="card-details overflow-hidden border-t border-gray-700/50 ${isExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}">
+                        <div class="p-4 space-y-4 bg-gray-800/40 text-right">
                             ${birthRow}
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div class="bg-white rounded-lg p-3 border border-stone-200">${purchaseRows}</div>
-                                <div class="bg-white rounded-lg p-3 border border-stone-200">${breedingRows}</div>
+                                <div class="bg-gray-800 rounded-lg p-3 border border-gray-700/50">${purchaseRows}</div>
+                                <div class="bg-gray-800 rounded-lg p-3 border border-gray-700/50">${breedingRows}</div>
                             </div>
-                            <div class="bg-white rounded-lg p-3 border border-stone-200">
-                                <div class="text-xs font-bold text-stone-500 mb-2">الملاحظات والسجل</div>
+                            <div class="bg-gray-800 rounded-lg p-3 border border-gray-700/50">
+                                <div class="text-xs font-bold text-gray-500 mb-2">الملاحظات والسجل</div>
                                 ${notesPreview}
                             </div>
                         </div>
@@ -454,9 +455,9 @@
 
             document.getElementById('formMode').value = 'UPDATE';
             document.getElementById('formTitle').innerText = `تعديل الخروف (${tagId})`;
-            document.getElementById('formTitle').className = 'text-lg font-bold text-amber-600';
+            document.getElementById('formTitle').className = 'text-lg font-bold text-yellow-400';
             document.getElementById('submitBtn').innerText = 'تحديث البيانات';
-            document.getElementById('submitBtn').className = 'w-full bg-amber-600 hover:bg-amber-700 transition font-bold py-3 px-4 rounded-lg text-white';
+            document.getElementById('submitBtn').className = 'w-full bg-yellow-600 hover:bg-yellow-700 transition font-bold py-3 px-4 rounded-lg text-white';
             document.getElementById('cancelBtn').classList.remove('hidden');
 
             openFormPanel();
@@ -467,9 +468,9 @@
             document.getElementById('tag_id').disabled = false;
             document.getElementById('formMode').value = 'CREATE';
             document.getElementById('formTitle').innerText = 'تسجيل رأس جديد';
-            document.getElementById('formTitle').className = 'text-lg font-bold text-lime-700';
+            document.getElementById('formTitle').className = 'text-lg font-bold text-blue-400';
             document.getElementById('submitBtn').innerText = 'حفظ البيانات';
-            document.getElementById('submitBtn').className = 'w-full bg-lime-600 hover:bg-lime-700 transition font-bold py-3 px-4 rounded-lg text-white';
+            document.getElementById('submitBtn').className = 'w-full bg-blue-600 hover:bg-blue-700 transition font-bold py-3 px-4 rounded-lg';
             document.getElementById('cancelBtn').classList.add('hidden');
         }
 
