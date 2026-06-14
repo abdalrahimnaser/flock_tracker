@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>مُتابع القطيع v2.6</title>
+    <title>مُتابع القطيع v2.7</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen font-sans">
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans relative">
 
     <div class="container mx-auto p-4 max-w-7xl">
         <header class="text-center my-6">
             <h1 class="text-3xl font-bold text-blue-400">مُتابع القطيع (FlockTracker)</h1>
-            <p class="text-gray-400 text-sm mt-1">إدارة شاملة مع خاصية التعديل والحذف</p>
+            <p class="text-gray-400 text-sm mt-1">نسخة محسنة لعرض السجلات والملاحظات الطويلة</p>
         </header>
 
         <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
@@ -24,7 +24,7 @@
 
                     <div>
                         <label class="block text-sm font-medium mb-1 text-gray-300">رقم الخروف *</label>
-                        <input type="text" id="tag_id" required class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <input type="text" id="tag_id" required class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1 text-gray-300">اسم الخروف</label>
@@ -72,8 +72,8 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1 text-gray-300">ملاحظات عامة</label>
-                        <textarea id="notes" rows="2" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+                        <label class="block text-sm font-medium mb-1 text-gray-300">ملاحظات عامة / سجلات علاجية</label>
+                        <textarea id="notes" rows="4" placeholder="أدخل الملاحظات واليوميات هنا..." class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white outline-none focus:ring-2 focus:ring-blue-500 text-xs resize-none"></textarea>
                     </div>
 
                     <button type="submit" id="submitBtn" class="w-full bg-blue-600 hover:bg-blue-700 transition font-bold py-3 px-4 rounded-lg mt-2">
@@ -90,11 +90,11 @@
                 <h2 class="text-xl font-bold mb-4 text-center lg:text-right">سجل البيانات الحالي</h2>
                 
                 <div class="mb-4">
-                    <input type="text" id="searchBar" placeholder="🔍 ابحث هنا بـ أي معلومة لتصفية الجدول فورا..." class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                    <input type="text" id="searchBar" placeholder="🔍 ابحث هنا بأي معلومة (بما في ذلك الملاحظات واليوميات المخفية)..." class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm">
                 </div>
 
                 <div class="overflow-x-auto rounded-lg border border-gray-700">
-                    <table class="w-full text-center border-collapse text-xs md:text-sm min-w-[1050px]">
+                    <table class="w-full text-center border-collapse text-xs md:text-sm min-w-[950px]">
                         <thead class="bg-blue-900/60 text-blue-300 font-bold border-b border-gray-700">
                             <tr>
                                 <th class="p-2.5">رقم الخروف</th>
@@ -103,7 +103,7 @@
                                 <th class="p-2.5">تاريخ الولادة</th>
                                 <th class="p-2.5">شراء (التاريخ / السعر / المكان)</th>
                                 <th class="p-2.5">التلقيح (التاريخ / النوع)</th>
-                                <th class="p-2.5">الملاحظات</th>
+                                <th class="p-2.5">السجل والملاحظات</th>
                                 <th class="p-2.5">خيارات الإدارة</th>
                             </tr>
                         </thead>
@@ -113,6 +113,20 @@
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    <div id="notesModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300" onclick="closeNotesModal()">
+        <div class="bg-gray-800 border border-gray-700 w-full max-w-lg p-6 rounded-xl shadow-2xl relative mx-4 text-right flex flex-col max-h-[80vh]" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between border-b border-gray-700 pb-3 mb-4">
+                <button onclick="closeNotesModal()" class="text-gray-400 hover:text-white font-bold text-lg">&times;</button>
+                <h3 id="modalHeader" class="text-lg font-bold text-blue-400">سجل ملاحظات الخروف</h3>
+            </div>
+            <div id="modalBody" class="text-sm text-gray-300 overflow-y-auto whitespace-pre-wrap break-words pr-2 leading-relaxed bg-gray-900/40 p-4 rounded-lg border border-gray-700/50 flex-1">
+                </div>
+            <div class="mt-4 pt-2 border-t border-gray-700 flex justify-end">
+                <button onclick="closeNotesModal()" class="bg-gray-700 hover:bg-gray-600 text-white text-xs font-semibold px-4 py-2 rounded-lg transition">إغلاق النافذة</button>
+            </div>
         </div>
     </div>
 
@@ -169,8 +183,13 @@
                 const bDate = s.breeding_date || "-";
                 const bType = s.breeding_type || "-";
                 const breedingCombined = (bDate==='-' && bType==='-') ? "-" : `${bDate} (${bType})`;
-                
-                const notesTxt = s.notes ? `<div class='max-w-xs overflow-hidden text-ellipsis whitespace-nowrap' title='${s.notes}'>${s.notes}</div>` : "<span class='text-gray-500'>-</span>";
+
+                // Dynamic UI configuration for Notes row entry
+                let notesButtonHTML = "<span class='text-gray-500'>لا توجد ملاحظات</span>";
+                if(s.notes && s.notes.trim() !== "") {
+                    // Safe injection passing key pointers safely into event execution strings
+                    notesButtonHTML = `<button onclick="openNotesModal('${s.tag_id}')" class="bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/30 px-3 py-1 rounded-md text-xs font-semibold transition">👁️ عرض السجل المتكامل</button>`;
+                }
 
                 tr.innerHTML = `
                     <td class="p-2.5 font-bold text-blue-400">${s.tag_id}</td>
@@ -179,7 +198,7 @@
                     <td class="p-2.5">${birthTxt}</td>
                     <td class="p-2.5 text-gray-400 text-xs">${purchaseCombined}</td>
                     <td class="p-2.5 text-gray-400 text-xs">${breedingCombined}</td>
-                    <td class="p-2.5 text-right text-xs text-gray-400">${notesTxt}</td>
+                    <td class="p-2.5">${notesButtonHTML}</td>
                     <td class="p-2.5 space-x-1 space-x-reverse whitespace-nowrap">
                         <button onclick="startEdit('${s.tag_id}')" class="bg-yellow-600/80 hover:bg-yellow-600 text-white font-medium text-xs px-2.5 py-1 rounded transition">تعديل</button>
                         <button onclick="deleteSheep('${s.tag_id}')" class="bg-red-600/80 hover:bg-red-600 text-white font-medium text-xs px-2.5 py-1 rounded transition">حذف</button>
@@ -189,14 +208,31 @@
             });
         }
 
-        // Triggered when clicking 'Edit' row action button
+        // Modal Presentation Management Actions
+        function openNotesModal(tagId) {
+            const sheep = allSheep.find(s => s.tag_id === tagId);
+            if (!sheep || !sheep.notes) return;
+
+            document.getElementById('modalHeader').innerText = `سجل وملاحظات الخروف رقم (${tagId})`;
+            document.getElementById('modalBody').innerText = sheep.notes;
+            
+            const modal = document.getElementById('notesModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        }
+
+        function closeNotesModal() {
+            const modal = document.getElementById('notesModal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
         function startEdit(tagId) {
             const sheep = allSheep.find(s => s.tag_id === tagId);
             if (!sheep) return;
 
-            // Load data objects into the interface fields directly
             document.getElementById('tag_id').value = sheep.tag_id;
-            document.getElementById('tag_id').disabled = true; // Lock tag_id during modification updates
+            document.getElementById('tag_id').disabled = true;
             document.getElementById('name').value = sheep.name;
             document.getElementById('breed').value = sheep.breed;
             document.getElementById('birth_date').value = sheep.birth_date;
@@ -207,7 +243,6 @@
             document.getElementById('breeding_type').value = sheep.breeding_type;
             document.getElementById('notes').value = sheep.notes;
 
-            // Shift form headers and buttons into visual Update layout configuration
             document.getElementById('formMode').value = "UPDATE";
             document.getElementById('formTitle').innerText = `تعديل بيانات الخروف رقم (${tagId})`;
             document.getElementById('formTitle').className = "text-xl font-bold mb-4 text-center border-b border-gray-700 pb-2 text-yellow-400";
@@ -215,13 +250,12 @@
             document.getElementById('submitBtn').className = "w-full bg-yellow-600 hover:bg-yellow-700 transition font-bold py-3 px-4 rounded-lg mt-2 text-white";
             document.getElementById('cancelBtn').classList.remove('hidden');
             
-            // Auto scroll form context up to top view focus window context for mobile handsets
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function resetFormState() {
             document.getElementById('sheepForm').reset();
-            document.getElementById('tag_id').disabled = false; // Release input lock toggle
+            document.getElementById('tag_id').disabled = false;
             document.getElementById('formMode').value = "CREATE";
             document.getElementById('formTitle').innerText = "تسجيل رأس جديد";
             document.getElementById('formTitle').className = "text-xl font-bold mb-4 text-center border-b border-gray-700 pb-2 text-blue-400";
@@ -238,7 +272,6 @@
                 const result = await response.json();
                 alert(result.message);
                 
-                // If deleting the sheep currently loaded into edit state, clear the form out safely
                 if (document.getElementById('tag_id').value === tagId && document.getElementById('formMode').value === "UPDATE") {
                     resetFormState();
                 }
@@ -246,7 +279,7 @@
             } catch (err) { alert("تعذر تنفيذ عملية الحذف."); }
         }
 
-        // Global Dynamic Search Key Handler
+        // The search entry continues to parse hidden notes content perfectly
         document.getElementById('searchBar').addEventListener('input', (e) => {
             const query = e.target.value.trim().toLowerCase();
             const filtered = allSheep.filter(s => {
@@ -256,10 +289,8 @@
             renderTable(filtered);
         });
 
-        // Combined Form Handling Router Pipeline intercepts
         document.getElementById('sheepForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
             const mode = document.getElementById('formMode').value;
             const tagId = document.getElementById('tag_id').value;
             
@@ -282,7 +313,7 @@
                 url = `/api/sheep/${tagId}`;
                 method = 'PUT';
             } else {
-                payload.tag_id = tagId; // Only pass primary key during creation scripts
+                payload.tag_id = tagId;
             }
 
             try {

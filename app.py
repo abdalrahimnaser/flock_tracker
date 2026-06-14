@@ -105,6 +105,54 @@ def add_sheep():
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
+@app.route('/api/sheep/<tag_id>', methods=['PUT'])
+def update_sheep(tag_id):
+    """Updates an existing sheep record matching the tag_id."""
+    data = request.json
+    name = data.get('name', '').strip()
+    breed = data.get('breed', '').strip()
+    birth_date = data.get('birth_date', '').strip()
+    purchase_date = data.get('purchase_date', '').strip()
+    purchase_price_str = data.get('purchase_price', '').strip()
+    purchase_location = data.get('purchase_location', '').strip()
+    breeding_date = data.get('breeding_date', '').strip()
+    breeding_type = data.get('breeding_type', '').strip()
+    notes = data.get('notes', '').strip()
+
+    purchase_price = None
+    if purchase_price_str:
+        try:
+            purchase_price = float(purchase_price_str)
+        except ValueError:
+            return jsonify({"success": False, "message": "يجب أن يكون سعر الشراء رقماً صحيحاً."}), 400
+
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE sheep
+            SET name=?, breed=?, birth_date=?, purchase_date=?, purchase_price=?, purchase_location=?, breeding_date=?, breeding_type=?, notes=?
+            WHERE tag_id=?
+        ''', (name, breed, birth_date, purchase_date, purchase_price, purchase_location, breeding_date, breeding_type, notes, tag_id))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "تم تعديل بيانات الخروف بنجاح!"})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/sheep/<tag_id>', methods=['DELETE'])
+def delete_sheep(tag_id):
+    """Deletes a sheep record matching the tag_id."""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM sheep WHERE tag_id=?", (tag_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "تم حذف رأس الماشية بنجاح!"})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
 if __name__ == '__main__':
     init_db()
     app.run(debug=True, host='0.0.0.0', port=5001)
