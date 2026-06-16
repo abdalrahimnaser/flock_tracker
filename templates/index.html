@@ -27,7 +27,7 @@
     <div class="container mx-auto p-4 max-w-5xl">
         <header class="my-6">
             <div class="text-center mb-5">
-                <h1 class="text-3xl font-bold text-lime-700">مُتابع القطيع (FlockTracker)</h1>
+                <h1 class="text-3xl font-bold text-lime-700">مُتابع القطيع</h1>
                 <p class="text-stone-500 text-sm mt-1">إدارة القطيع — عرض بطاقات وتفاصيل موسّعة</p>
             </div>
             <div id="statsBar" class="grid grid-cols-3 gap-3 text-center">
@@ -40,8 +40,8 @@
                     <div class="text-xs text-stone-500 mt-0.5">سلالات</div>
                 </div>
                 <div class="bg-white border border-stone-200 rounded-xl p-3 shadow-sm">
-                    <div id="statNotes" class="text-2xl font-bold text-orange-600">0</div>
-                    <div class="text-xs text-stone-500 mt-0.5">لديهم ملاحظات</div>
+                    <div id="statMothers" class="text-2xl font-bold text-rose-600">0</div>
+                    <div class="text-xs text-stone-500 mt-0.5">أمهات</div>
                 </div>
             </div>
         </header>
@@ -96,12 +96,8 @@
                     <input type="text" id="tag_id" required class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500 disabled:opacity-50">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-1 text-stone-700">اسم الخروف</label>
-                    <input type="text" id="name" class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1 text-stone-700">نوع / سلالة الخروف</label>
-                    <input type="text" id="breed" list="breedOptions" class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500" placeholder="اكتب أو اختر...">
+                    <label class="block text-sm font-medium mb-1 text-stone-700">سلالة الخروف</label>
+                    <input type="text" id="breed" list="breedOptions" class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500" placeholder="غير محدد">
                     <datalist id="breedOptions">
                         <option value="دروبر">
                         <option value="سفلك">
@@ -110,8 +106,38 @@
                     </datalist>
                 </div>
                 <div>
+                    <label class="block text-sm font-medium mb-1 text-stone-700">جنس الخروف</label>
+                    <select id="sheep_type" required class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                        <option value="حملة">حملة</option>
+                        <option value="خروف">خروف</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-stone-700">حالة الحياة</label>
+                    <select id="life_status" required class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                        <option value="حي">حي</option>
+                        <option value="ميت">ميت</option>
+                    </select>
+                </div>
+                <div>
                     <label class="block text-sm font-medium mb-1 text-stone-700">تاريخ الولادة</label>
                     <input type="date" id="birth_date" class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                </div>
+                <div class="p-3 bg-stone-50 rounded-lg border border-stone-200 space-y-3">
+                    <span class="block text-xs font-bold text-stone-500">حالة الأمومة</span>
+                    <div>
+                        <label class="block text-xs font-medium mb-1 text-stone-500">حالة الأم</label>
+                        <select id="mother_status" required class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                            <option value="ليس أم بعد">ليس أم بعد</option>
+                            <option value="أم">أم</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium mb-1 text-stone-500">رقم الأم</label>
+                        <select id="mother_id" class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                            <option value="">بدون أم</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="p-3 bg-stone-50 rounded-lg border border-stone-200 space-y-3">
                     <span class="block text-xs font-bold text-stone-500">بيانات الشراء</span>
@@ -128,24 +154,13 @@
                         <input type="text" id="purchase_location" class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
                     </div>
                 </div>
-                <div class="p-3 bg-stone-50 rounded-lg border border-stone-200 space-y-3">
-                    <span class="block text-xs font-bold text-amber-600">بيانات التلقيح</span>
-                    <div>
-                        <label class="block text-xs font-medium mb-1 text-stone-500">تاريخ التلقيح</label>
-                        <input type="date" id="breeding_date" class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium mb-1 text-stone-500">نوع التلقيح</label>
-                        <select id="breeding_type" class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
-                            <option value="">غير محدد</option>
-                            <option value="طبيعي">طبيعي</option>
-                            <option value="صناعي">صناعي</option>
-                        </select>
-                    </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-stone-700">اسم الخروف</label>
+                    <input type="text" id="name" class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-1 text-stone-700">ملاحظات عامة / سجلات علاجية</label>
-                    <textarea id="notes" rows="4" placeholder="أدخل الملاحظات واليوميات هنا..." class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500 text-sm resize-none"></textarea>
+                    <label class="block text-sm font-medium mb-1 text-stone-700">ملاحظات</label>
+                    <textarea id="notes" rows="4" placeholder="أدخل الملاحظات هنا..." class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500 text-sm resize-none"></textarea>
                 </div>
             </form>
         </div>
@@ -216,6 +231,7 @@
 
         function openFormPanel(reset = false) {
             if (reset) resetFormState();
+            populateMotherOptions(document.getElementById('tag_id').disabled ? document.getElementById('tag_id').value : '');
             document.getElementById('formBackdrop').classList.remove('hidden');
             document.getElementById('formPanel').classList.remove('translate-x-full');
             requestAnimationFrame(() => {
@@ -247,6 +263,41 @@
             } catch (err) { console.error(err); }
         }
 
+        function populateMotherOptions(excludeTagId = '') {
+            const select = document.getElementById('mother_id');
+            const currentValue = select.value;
+            const candidates = allSheep
+                .filter(s => s.tag_id !== excludeTagId && s.sheep_type === 'حملة')
+                .sort((a, b) => a.tag_id.localeCompare(b.tag_id, 'ar'));
+
+            select.innerHTML = '<option value="">بدون أم</option>';
+            candidates.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.tag_id;
+                opt.textContent = s.tag_id;
+                select.appendChild(opt);
+            });
+
+            if (currentValue && [...select.options].some(o => o.value === currentValue)) {
+                select.value = currentValue;
+            }
+        }
+
+        function breedLabel(breed) {
+            return breed && breed.trim() ? breed.trim() : 'غير محدد';
+        }
+
+        function getChildren(tagId) {
+            return allSheep.filter(s => s.mother_id === tagId);
+        }
+
+        function childCountLabel(count) {
+            if (count === 1) return '1 ابن';
+            if (count === 2) return '2 ابنان';
+            if (count >= 3 && count <= 10) return `${count} أبناء`;
+            return `${count} ابناً`;
+        }
+
         async function fetchSheep() {
             try {
                 const response = await fetch('/api/sheep');
@@ -262,10 +313,10 @@
 
         function updateStats() {
             const breeds = new Set(allSheep.map(s => s.breed).filter(Boolean));
-            const withNotes = allSheep.filter(s => s.notes && s.notes.trim()).length;
+            const mothers = allSheep.filter(s => s.mother_status === 'أم').length;
             document.getElementById('statTotal').textContent = allSheep.length;
             document.getElementById('statBreeds').textContent = breeds.size;
-            document.getElementById('statNotes').textContent = withNotes;
+            document.getElementById('statMothers').textContent = mothers;
         }
 
         function renderBreedFilters() {
@@ -297,7 +348,7 @@
             }
             if (query) {
                 filtered = filtered.filter(s => {
-                    const combined = `${s.tag_id} ${s.name} ${s.breed} ${s.birth_date} ${s.purchase_date} ${s.purchase_price} ${s.purchase_location} ${s.breeding_date} ${s.breeding_type} ${s.notes}`.toLowerCase();
+                    const combined = `${s.tag_id} ${s.name} ${breedLabel(s.breed)} ${s.sheep_type} ${s.life_status} ${s.mother_status} ${s.mother_id} ${s.child_count} ${s.birth_date} ${s.purchase_date} ${s.purchase_price} ${s.purchase_location} ${s.notes}`.toLowerCase();
                     return combined.includes(query);
                 });
             }
@@ -307,10 +358,6 @@
 
         function hasPurchase(s) {
             return !!(s.purchase_date || s.purchase_price || s.purchase_location);
-        }
-
-        function hasBreeding(s) {
-            return !!(s.breeding_date || s.breeding_type);
         }
 
         function hasNotes(s) {
@@ -342,10 +389,18 @@
             list.innerHTML = data.map(s => {
                 const safeTag = escapeHtml(s.tag_id);
                 const isExpanded = expandedCards.has(s.tag_id);
-                const nameHtml = s.name ? `<div class="text-stone-500 text-sm mt-0.5">${escapeHtml(s.name)}</div>` : '';
-                const breed = s.breed
-                    ? `<span class="text-base text-lime-700">${escapeHtml(s.breed)}</span>`
-                    : '<span class="text-sm text-stone-500">بدون سلالة</span>';
+                const childCount = s.child_count || 0;
+                const children = getChildren(s.tag_id);
+                const isDead = s.life_status === 'ميت';
+                const metaHtml = (s.sheep_type || s.breed || s.mother_status || childCount || s.life_status)
+                    ? `<div class="text-stone-500 text-sm mt-0.5 flex items-center gap-2 flex-wrap justify-start">
+                        ${s.life_status === 'ميت' ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-red-600 text-white">ميت</span>` : `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">حي</span>`}
+                        ${s.sheep_type ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full ${s.sheep_type === 'حملة' ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700'}">${escapeHtml(s.sheep_type)}</span>` : ''}
+                        <span class="text-xs font-medium px-2 py-0.5 rounded-full ${s.breed && s.breed.trim() ? 'bg-lime-100 text-lime-700' : 'bg-stone-100 text-stone-500'}">${escapeHtml(breedLabel(s.breed))}</span>
+                        ${s.mother_status === 'أم' ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">أم</span>` : ''}
+                        ${childCount > 0 ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">${childCountLabel(childCount)}</span>` : ''}
+                       </div>`
+                    : '';
 
                 const birthRow = s.birth_date
                     ? `<div class="flex justify-between text-sm"><span class="text-stone-500">تاريخ الولادة</span><span>${escapeHtml(s.birth_date)}</span></div>`
@@ -358,19 +413,13 @@
                     ${s.purchase_location ? `<div class="flex justify-between text-sm mb-1"><span class="text-stone-500">المكان</span><span>${escapeHtml(s.purchase_location)}</span></div>` : ''}
                 ` : `<div class="text-sm text-stone-500">لا توجد بيانات شراء</div>`;
 
-                const breedingRows = hasBreeding(s) ? `
-                    <div class="text-xs font-bold text-stone-500 mb-2 mt-1">بيانات التلقيح</div>
-                    ${s.breeding_date ? `<div class="flex justify-between text-sm mb-1"><span class="text-stone-500">التاريخ</span><span>${escapeHtml(s.breeding_date)}</span></div>` : ''}
-                    ${s.breeding_type ? `<div class="flex justify-between text-sm mb-1"><span class="text-stone-500">النوع</span><span>${escapeHtml(s.breeding_type)}</span></div>` : ''}
-                ` : `<div class="text-sm text-stone-500">لا توجد بيانات تلقيح</div>`;
-
                 const notesPreview = hasNotes(s)
                     ? `<p class="text-sm text-stone-600 line-clamp-2 leading-relaxed mb-2">${escapeHtml(s.notes.slice(0, 120))}${s.notes.length > 120 ? '…' : ''}</p>
                        <button data-action="notes" data-tag="${safeTag}" class="text-lime-700 hover:text-lime-800 text-xs font-semibold transition">عرض السجل الكامل ←</button>`
                     : `<span class="text-sm text-stone-500">لا توجد ملاحظات</span>`;
 
                 return `
-                <div class="border border-stone-200 rounded-lg overflow-hidden bg-white" data-tag="${safeTag}">
+                <div class="border border-stone-200 rounded-lg overflow-hidden bg-white ${isDead ? 'opacity-75' : ''}" data-tag="${safeTag}">
                     <div class="px-3 py-3 cursor-pointer select-none card-header">
                         <div class="flex items-center justify-between gap-4" dir="ltr">
                             <div class="flex items-center gap-0.5 shrink-0">
@@ -385,20 +434,23 @@
                             <div class="flex-1 min-w-0 text-right" dir="rtl">
                                 <div class="flex items-baseline gap-2 flex-wrap justify-start">
                                     <span class="text-xl font-semibold text-stone-900">${safeTag}</span>
-                                    <span class="text-stone-300">·</span>
-                                    ${breed}
                                 </div>
-                                ${nameHtml}
+                                ${metaHtml}
                             </div>
                         </div>
                     </div>
                     <div class="card-details overflow-hidden border-t border-stone-200 ${isExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}">
                         <div class="p-4 space-y-4 bg-stone-50 text-right">
+                            ${s.name ? `<div class="flex justify-between text-sm"><span class="text-stone-500">اسم الخروف</span><span>${escapeHtml(s.name)}</span></div>` : ''}
                             ${birthRow}
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div class="bg-white rounded-lg p-3 border border-stone-200">${purchaseRows}</div>
-                                <div class="bg-white rounded-lg p-3 border border-stone-200">${breedingRows}</div>
-                            </div>
+                            ${s.sheep_type ? `<div class="flex justify-between text-sm"><span class="text-stone-500">جنس الخروف</span><span>${escapeHtml(s.sheep_type)}</span></div>` : ''}
+                            ${s.life_status ? `<div class="flex justify-between text-sm"><span class="text-stone-500">حالة الحياة</span><span>${escapeHtml(s.life_status)}</span></div>` : ''}
+                            ${s.breed !== undefined ? `<div class="flex justify-between text-sm"><span class="text-stone-500">سلالة الخروف</span><span>${escapeHtml(breedLabel(s.breed))}</span></div>` : ''}
+                            ${s.mother_status ? `<div class="flex justify-between text-sm"><span class="text-stone-500">حالة الأم</span><span>${escapeHtml(s.mother_status)}</span></div>` : ''}
+                            ${childCount > 0 ? `<div class="flex justify-between text-sm"><span class="text-stone-500">عدد الأبناء</span><span>${childCountLabel(childCount)}</span></div>` : ''}
+                            ${children.length ? `<div class="text-sm"><span class="text-stone-500 block mb-1">أرقام الأبناء</span><span class="text-stone-800">${children.map(c => escapeHtml(c.tag_id)).join(' · ')}</span></div>` : ''}
+                            ${s.mother_id ? `<div class="flex justify-between text-sm"><span class="text-stone-500">رقم الأم</span><span>${escapeHtml(s.mother_id)}</span></div>` : ''}
+                            <div class="bg-white rounded-lg p-3 border border-stone-200">${purchaseRows}</div>
                             <div class="bg-white rounded-lg p-3 border border-stone-200">
                                 <div class="text-xs font-bold text-stone-500 mb-2">الملاحظات والسجل</div>
                                 ${notesPreview}
@@ -444,12 +496,15 @@
             document.getElementById('tag_id').disabled = true;
             document.getElementById('name').value = sheep.name || '';
             document.getElementById('breed').value = sheep.breed || '';
+            document.getElementById('sheep_type').value = sheep.sheep_type || 'حملة';
+            document.getElementById('life_status').value = sheep.life_status || 'حي';
             document.getElementById('birth_date').value = sheep.birth_date || '';
+            document.getElementById('mother_status').value = sheep.mother_status || 'ليس أم بعد';
+            populateMotherOptions(sheep.tag_id);
+            document.getElementById('mother_id').value = sheep.mother_id || '';
             document.getElementById('purchase_date').value = sheep.purchase_date || '';
             document.getElementById('purchase_price').value = sheep.purchase_price || '';
             document.getElementById('purchase_location').value = sheep.purchase_location || '';
-            document.getElementById('breeding_date').value = sheep.breeding_date || '';
-            document.getElementById('breeding_type').value = sheep.breeding_type || '';
             document.getElementById('notes').value = sheep.notes || '';
 
             document.getElementById('formMode').value = 'UPDATE';
@@ -465,6 +520,9 @@
         function resetFormState() {
             document.getElementById('sheepForm').reset();
             document.getElementById('tag_id').disabled = false;
+            document.getElementById('mother_status').value = 'ليس أم بعد';
+            document.getElementById('life_status').value = 'حي';
+            populateMotherOptions();
             document.getElementById('formMode').value = 'CREATE';
             document.getElementById('formTitle').innerText = 'تسجيل رأس جديد';
             document.getElementById('formTitle').className = 'text-lg font-bold text-lime-700';
@@ -525,12 +583,14 @@
             const payload = {
                 name: document.getElementById('name').value,
                 breed: document.getElementById('breed').value,
+                sheep_type: document.getElementById('sheep_type').value,
+                life_status: document.getElementById('life_status').value,
                 birth_date: document.getElementById('birth_date').value,
+                mother_status: document.getElementById('mother_status').value,
+                mother_id: document.getElementById('mother_id').value,
                 purchase_date: document.getElementById('purchase_date').value,
                 purchase_price: document.getElementById('purchase_price').value,
                 purchase_location: document.getElementById('purchase_location').value,
-                breeding_date: document.getElementById('breeding_date').value,
-                breeding_type: document.getElementById('breeding_type').value,
                 notes: document.getElementById('notes').value
             };
 

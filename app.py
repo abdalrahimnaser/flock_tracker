@@ -13,17 +13,66 @@ def init_db():
             tag_id TEXT PRIMARY KEY,
             name TEXT,
             breed TEXT,
+            sheep_type TEXT,
             birth_date TEXT,
             purchase_date TEXT,
             purchase_price REAL,
             purchase_location TEXT,
             breeding_date TEXT,
             breeding_type TEXT,
-            notes TEXT
+            notes TEXT,
+            mother_status TEXT,
+            mother_id TEXT,
+            life_status TEXT
         )
     ''')
+    cursor.execute("PRAGMA table_info(sheep)")
+    columns = {row[1] for row in cursor.fetchall()}
+    if 'sheep_type' not in columns:
+        cursor.execute("ALTER TABLE sheep ADD COLUMN sheep_type TEXT")
+    if 'mother_status' not in columns:
+        cursor.execute("ALTER TABLE sheep ADD COLUMN mother_status TEXT")
+    if 'mother_id' not in columns:
+        cursor.execute("ALTER TABLE sheep ADD COLUMN mother_id TEXT")
+    if 'life_status' not in columns:
+        cursor.execute("ALTER TABLE sheep ADD COLUMN life_status TEXT")
+    cursor.execute("UPDATE sheep SET mother_status = 'أم' WHERE mother_status = 'آم'")
+    cursor.execute("UPDATE sheep SET mother_status = 'ليس أم بعد' WHERE mother_status = 'ليس ام بعد'")
+    cursor.execute("UPDATE sheep SET life_status = 'حي' WHERE life_status IS NULL OR life_status = ''")
     conn.commit()
     conn.close()
+
+def sheep_row_to_dict(row):
+    return {
+        "tag_id": row[0],
+        "name": row[1],
+        "breed": row[2],
+        "sheep_type": row[3],
+        "birth_date": row[4],
+        "purchase_date": row[5],
+        "purchase_price": row[6],
+        "purchase_location": row[7],
+        "notes": row[8],
+        "mother_status": row[9],
+        "mother_id": row[10],
+        "life_status": row[11],
+        "child_count": row[12],
+    }
+
+SHEEP_SELECT = """
+    SELECT tag_id, name, breed, sheep_type, birth_date, purchase_date,
+           purchase_price, purchase_location, notes,
+           mother_status, mother_id, life_status,
+           (SELECT COUNT(*) FROM sheep c WHERE c.mother_id = sheep.tag_id) AS child_count
+    FROM sheep
+"""
+
+def mark_mother_as_um(cursor, mother_id):
+    if mother_id:
+        cursor.execute(
+            "UPDATE sheep SET mother_status = ? WHERE tag_id = ?",
+            ("أم", mother_id),
+        )
 
 @app.route('/')
 def index():
@@ -45,25 +94,11 @@ def get_sheep():
     """Fetches all sheep records with the updated spec sheet fields."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM sheep")
+    cursor.execute(SHEEP_SELECT)
     rows = cursor.fetchall()
     conn.close()
     
-    sheep_list = []
-    for row in rows:
-        sheep_list.append({
-            "tag_id": row[0],
-            "name": row[1],
-            "breed": row[2],
-            "birth_date": row[3],
-            "purchase_date": row[4],
-            "purchase_price": row[5],
-            "purchase_location": row[6],
-            "breeding_date": row[7],
-            "breeding_type": row[8],
-            "notes": row[9]
-        })
-    return jsonify(sheep_list)
+    return jsonify([sheep_row_to_dict(row) for row in rows])
 
 @app.route('/api/sheep', methods=['POST'])
 def add_sheep():
@@ -72,16 +107,21 @@ def add_sheep():
     tag_id = data.get('tag_id', '').strip()
     name = data.get('name', '').strip()
     breed = data.get('breed', '').strip()
+    sheep_type = data.get('sheep_type', '').strip()
     birth_date = data.get('birth_date', '').strip()
     purchase_date = data.get('purchase_date', '').strip()
     purchase_price_str = data.get('purchase_price', '').strip()
     purchase_location = data.get('purchase_location', '').strip()
-    breeding_date = data.get('breeding_date', '').strip()
-    breeding_type = data.get('breeding_type', '').strip()
     notes = data.get('notes', '').strip()
+    mother_status = data.get('mother_status', '').strip() or 'ليس أم بعد'
+    mother_id = data.get('mother_id', '').strip()
+    life_status = data.get('life_status', '').strip() or 'حي'
 
     if not tag_id:
         return jsonify({"success": False, "message": "الرجاء إدخال رقم الخروف الحتمي."}), 400
+
+    if mother_id == tag_id:
+        return jsonify({"success": False, "message": "لا يمكن أن يكون الخروف أمّاً لنفسه."}), 400
 
     purchase_price = None
     if purchase_price_str:
@@ -93,10 +133,18 @@ def add_sheep():
     try:
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
+
+        if mother_id:
+            cursor.execute("SELECT tag_id FROM sheep WHERE tag_id = ?", (mother_id,))
+            if not cursor.fetchone():
+                conn.close()
+                return jsonify({"success": False, "message": f"رقم الأم '{mother_id}' غير موجود في السجل."}), 400
+
         cursor.execute('''
-            INSERT INTO sheep (tag_id, name, breed, birth_date, purchase_date, purchase_price, purchase_location, breeding_date, breeding_type, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (tag_id, name, breed, birth_date, purchase_date, purchase_price, purchase_location, breeding_date, breeding_type, notes))
+            INSERT INTO sheep (tag_id, name, breed, sheep_type, birth_date, purchase_date, purchase_price, purchase_location, notes, mother_status, mother_id, life_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (tag_id, name, breed, sheep_type, birth_date, purchase_date, purchase_price, purchase_location, notes, mother_status, mother_id or None, life_status))
+        mark_mother_as_um(cursor, mother_id)
         conn.commit()
         conn.close()
         return jsonify({"success": True, "message": "تم حفظ بيانات الخروف بنجاح!"})
@@ -111,13 +159,18 @@ def update_sheep(tag_id):
     data = request.json
     name = data.get('name', '').strip()
     breed = data.get('breed', '').strip()
+    sheep_type = data.get('sheep_type', '').strip()
     birth_date = data.get('birth_date', '').strip()
     purchase_date = data.get('purchase_date', '').strip()
     purchase_price_str = data.get('purchase_price', '').strip()
     purchase_location = data.get('purchase_location', '').strip()
-    breeding_date = data.get('breeding_date', '').strip()
-    breeding_type = data.get('breeding_type', '').strip()
     notes = data.get('notes', '').strip()
+    mother_status = data.get('mother_status', '').strip() or 'ليس أم بعد'
+    mother_id = data.get('mother_id', '').strip()
+    life_status = data.get('life_status', '').strip() or 'حي'
+
+    if mother_id == tag_id:
+        return jsonify({"success": False, "message": "لا يمكن أن يكون الخروف أمّاً لنفسه."}), 400
 
     purchase_price = None
     if purchase_price_str:
@@ -129,11 +182,19 @@ def update_sheep(tag_id):
     try:
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
+
+        if mother_id:
+            cursor.execute("SELECT tag_id FROM sheep WHERE tag_id = ?", (mother_id,))
+            if not cursor.fetchone():
+                conn.close()
+                return jsonify({"success": False, "message": f"رقم الأم '{mother_id}' غير موجود في السجل."}), 400
+
         cursor.execute('''
             UPDATE sheep
-            SET name=?, breed=?, birth_date=?, purchase_date=?, purchase_price=?, purchase_location=?, breeding_date=?, breeding_type=?, notes=?
+            SET name=?, breed=?, sheep_type=?, birth_date=?, purchase_date=?, purchase_price=?, purchase_location=?, notes=?, mother_status=?, mother_id=?, life_status=?
             WHERE tag_id=?
-        ''', (name, breed, birth_date, purchase_date, purchase_price, purchase_location, breeding_date, breeding_type, notes, tag_id))
+        ''', (name, breed, sheep_type, birth_date, purchase_date, purchase_price, purchase_location, notes, mother_status, mother_id or None, life_status, tag_id))
+        mark_mother_as_um(cursor, mother_id)
         conn.commit()
         conn.close()
         return jsonify({"success": True, "message": "تم تعديل بيانات الخروف بنجاح!"})
