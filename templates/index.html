@@ -126,16 +126,9 @@
                 <div class="p-3 bg-stone-50 rounded-lg border border-stone-200 space-y-3">
                     <span class="block text-xs font-bold text-stone-500">حالة الأمومة</span>
                     <div>
-                        <label class="block text-xs font-medium mb-1 text-stone-500">حالة الأم</label>
-                        <select id="mother_status" required class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
-                            <option value="ليس أم بعد">ليس أم بعد</option>
-                            <option value="أم">أم</option>
-                        </select>
-                    </div>
-                    <div>
                         <label class="block text-xs font-medium mb-1 text-stone-500">رقم الأم</label>
                         <select id="mother_id" class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
-                            <option value="">بدون أم</option>
+                            <option value="">غير محدد</option>
                         </select>
                     </div>
                 </div>
@@ -270,7 +263,7 @@
                 .filter(s => s.tag_id !== excludeTagId && s.sheep_type === 'حملة')
                 .sort((a, b) => a.tag_id.localeCompare(b.tag_id, 'ar'));
 
-            select.innerHTML = '<option value="">بدون أم</option>';
+            select.innerHTML = '<option value="">غير محدد</option>';
             candidates.forEach(s => {
                 const opt = document.createElement('option');
                 opt.value = s.tag_id;
@@ -287,8 +280,69 @@
             return breed && breed.trim() ? breed.trim() : 'غير محدد';
         }
 
+        function motherStatusLabel(sheep) {
+            return sheep.mother_status === 'أم' ? 'أم' : 'ليس أم بعد';
+        }
+
+        function todayDateString() {
+            const d = new Date();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${d.getFullYear()}-${month}-${day}`;
+        }
+
+        function formatAge(birthDate) {
+            if (!birthDate) return '';
+            const birth = new Date(`${birthDate}T00:00:00`);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (Number.isNaN(birth.getTime()) || birth > today) return '—';
+
+            let years = today.getFullYear() - birth.getFullYear();
+            let months = today.getMonth() - birth.getMonth();
+            let days = today.getDate() - birth.getDate();
+
+            if (days < 0) {
+                months -= 1;
+                days += new Date(today.getFullYear(), today.getMonth(), 0).getDate();
+            }
+            if (months < 0) {
+                years -= 1;
+                months += 12;
+            }
+
+            const parts = [];
+            if (years > 0) {
+                if (years === 1) parts.push('سنة واحدة');
+                else if (years === 2) parts.push('سنتان');
+                else if (years <= 10) parts.push(`${years} سنوات`);
+                else parts.push(`${years} سنة`);
+            }
+            if (months > 0) {
+                if (months === 1) parts.push('شهر واحد');
+                else if (months === 2) parts.push('شهران');
+                else if (months <= 10) parts.push(`${months} أشهر`);
+                else parts.push(`${months} شهراً`);
+            }
+            if (years === 0 && months === 0) {
+                if (days === 0) return 'اليوم';
+                if (days === 1) return 'يوم واحد';
+                if (days === 2) return 'يومان';
+                if (days <= 10) return `${days} أيام`;
+                return `${days} يوماً`;
+            }
+            return parts.join(' و ');
+        }
+
         function getChildren(tagId) {
             return allSheep.filter(s => s.mother_id === tagId);
+        }
+
+        function getChildCounts(tagId) {
+            const children = getChildren(tagId);
+            const live = children.filter(c => c.life_status !== 'ميت').length;
+            const dead = children.filter(c => c.life_status === 'ميت').length;
+            return { live, dead, total: children.length };
         }
 
         function childCountLabel(count) {
@@ -389,21 +443,20 @@
             list.innerHTML = data.map(s => {
                 const safeTag = escapeHtml(s.tag_id);
                 const isExpanded = expandedCards.has(s.tag_id);
-                const childCount = s.child_count || 0;
+                const { live: liveChildren, dead: deadChildren, total: childCount } = getChildCounts(s.tag_id);
                 const children = getChildren(s.tag_id);
                 const isDead = s.life_status === 'ميت';
-                const metaHtml = (s.sheep_type || s.breed || s.mother_status || childCount || s.life_status)
+                const metaHtml = (s.sheep_type || s.breed || s.life_status)
                     ? `<div class="text-stone-500 text-sm mt-0.5 flex items-center gap-2 flex-wrap justify-start">
                         ${s.life_status === 'ميت' ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-red-600 text-white">ميت</span>` : `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">حي</span>`}
                         ${s.sheep_type ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full ${s.sheep_type === 'حملة' ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700'}">${escapeHtml(s.sheep_type)}</span>` : ''}
                         <span class="text-xs font-medium px-2 py-0.5 rounded-full ${s.breed && s.breed.trim() ? 'bg-lime-100 text-lime-700' : 'bg-stone-100 text-stone-500'}">${escapeHtml(breedLabel(s.breed))}</span>
-                        ${s.mother_status === 'أم' ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">أم</span>` : ''}
-                        ${childCount > 0 ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">${childCountLabel(childCount)}</span>` : ''}
                        </div>`
                     : '';
 
                 const birthRow = s.birth_date
-                    ? `<div class="flex justify-between text-sm"><span class="text-stone-500">تاريخ الولادة</span><span>${escapeHtml(s.birth_date)}</span></div>`
+                    ? `<div class="flex justify-between text-sm"><span class="text-stone-500">تاريخ الولادة</span><span>${escapeHtml(s.birth_date)}</span></div>
+                       <div class="flex justify-between text-sm"><span class="text-stone-500">العمر</span><span>${formatAge(s.birth_date)}</span></div>`
                     : '';
 
                 const purchaseRows = hasPurchase(s) ? `
@@ -446,10 +499,13 @@
                             ${s.sheep_type ? `<div class="flex justify-between text-sm"><span class="text-stone-500">جنس الخروف</span><span>${escapeHtml(s.sheep_type)}</span></div>` : ''}
                             ${s.life_status ? `<div class="flex justify-between text-sm"><span class="text-stone-500">حالة الحياة</span><span>${escapeHtml(s.life_status)}</span></div>` : ''}
                             ${s.breed !== undefined ? `<div class="flex justify-between text-sm"><span class="text-stone-500">سلالة الخروف</span><span>${escapeHtml(breedLabel(s.breed))}</span></div>` : ''}
-                            ${s.mother_status ? `<div class="flex justify-between text-sm"><span class="text-stone-500">حالة الأم</span><span>${escapeHtml(s.mother_status)}</span></div>` : ''}
-                            ${childCount > 0 ? `<div class="flex justify-between text-sm"><span class="text-stone-500">عدد الأبناء</span><span>${childCountLabel(childCount)}</span></div>` : ''}
+                            <div class="flex justify-between text-sm"><span class="text-stone-500">حالة الأم</span><span>${motherStatusLabel(s)}</span></div>
+                            ${childCount > 0 ? `
+                                ${liveChildren > 0 ? `<div class="flex justify-between text-sm"><span class="text-stone-500">أبناء أحياء</span><span>${childCountLabel(liveChildren)}</span></div>` : ''}
+                                ${deadChildren > 0 ? `<div class="flex justify-between text-sm"><span class="text-stone-500">أبناء أموات</span><span>${childCountLabel(deadChildren)}</span></div>` : ''}
+                            ` : ''}
                             ${children.length ? `<div class="text-sm"><span class="text-stone-500 block mb-1">أرقام الأبناء</span><span class="text-stone-800">${children.map(c => escapeHtml(c.tag_id)).join(' · ')}</span></div>` : ''}
-                            ${s.mother_id ? `<div class="flex justify-between text-sm"><span class="text-stone-500">رقم الأم</span><span>${escapeHtml(s.mother_id)}</span></div>` : ''}
+                            ${s.mother_id ? `<div class="flex justify-between text-sm"><span class="text-stone-500">رقم الأم</span><span>${escapeHtml(s.mother_id)}</span></div>` : `<div class="flex justify-between text-sm"><span class="text-stone-500">رقم الأم</span><span>غير محدد</span></div>`}
                             <div class="bg-white rounded-lg p-3 border border-stone-200">${purchaseRows}</div>
                             <div class="bg-white rounded-lg p-3 border border-stone-200">
                                 <div class="text-xs font-bold text-stone-500 mb-2">الملاحظات والسجل</div>
@@ -498,8 +554,7 @@
             document.getElementById('breed').value = sheep.breed || '';
             document.getElementById('sheep_type').value = sheep.sheep_type || 'حملة';
             document.getElementById('life_status').value = sheep.life_status || 'حي';
-            document.getElementById('birth_date').value = sheep.birth_date || '';
-            document.getElementById('mother_status').value = sheep.mother_status || 'ليس أم بعد';
+            document.getElementById('birth_date').value = sheep.birth_date || todayDateString();
             populateMotherOptions(sheep.tag_id);
             document.getElementById('mother_id').value = sheep.mother_id || '';
             document.getElementById('purchase_date').value = sheep.purchase_date || '';
@@ -520,8 +575,8 @@
         function resetFormState() {
             document.getElementById('sheepForm').reset();
             document.getElementById('tag_id').disabled = false;
-            document.getElementById('mother_status').value = 'ليس أم بعد';
             document.getElementById('life_status').value = 'حي';
+            document.getElementById('birth_date').value = todayDateString();
             populateMotherOptions();
             document.getElementById('formMode').value = 'CREATE';
             document.getElementById('formTitle').innerText = 'تسجيل رأس جديد';
@@ -585,8 +640,7 @@
                 breed: document.getElementById('breed').value,
                 sheep_type: document.getElementById('sheep_type').value,
                 life_status: document.getElementById('life_status').value,
-                birth_date: document.getElementById('birth_date').value,
-                mother_status: document.getElementById('mother_status').value,
+                birth_date: document.getElementById('birth_date').value || todayDateString(),
                 mother_id: document.getElementById('mother_id').value,
                 purchase_date: document.getElementById('purchase_date').value,
                 purchase_price: document.getElementById('purchase_price').value,

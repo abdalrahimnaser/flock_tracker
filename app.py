@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 import sqlite3
+from datetime import date
 
 app = Flask(__name__)
 DB_NAME = "farm_data.db"
@@ -37,8 +38,9 @@ def init_db():
     if 'life_status' not in columns:
         cursor.execute("ALTER TABLE sheep ADD COLUMN life_status TEXT")
     cursor.execute("UPDATE sheep SET mother_status = 'أم' WHERE mother_status = 'آم'")
-    cursor.execute("UPDATE sheep SET mother_status = 'ليس أم بعد' WHERE mother_status = 'ليس ام بعد'")
+    cursor.execute("UPDATE sheep SET mother_status = 'ليس أم بعد' WHERE mother_status IN ('ليس ام بعد', 'غير محدد') OR mother_status IS NULL OR mother_status = ''")
     cursor.execute("UPDATE sheep SET life_status = 'حي' WHERE life_status IS NULL OR life_status = ''")
+    sync_all_mother_statuses(cursor)
     conn.commit()
     conn.close()
 
@@ -67,12 +69,28 @@ SHEEP_SELECT = """
     FROM sheep
 """
 
-def mark_mother_as_um(cursor, mother_id):
-    if mother_id:
-        cursor.execute(
-            "UPDATE sheep SET mother_status = ? WHERE tag_id = ?",
-            ("أم", mother_id),
-        )
+def sync_mother_status(cursor, tag_id):
+    """Set mother_status from whether this sheep actually has children."""
+    if not tag_id:
+        return
+    cursor.execute(
+        "SELECT COUNT(*) FROM sheep WHERE mother_id = ?",
+        (tag_id,),
+    )
+    count = cursor.fetchone()[0]
+    cursor.execute(
+        "UPDATE sheep SET mother_status = ? WHERE tag_id = ?",
+        ("أم" if count > 0 else "ليس أم بعد", tag_id),
+    )
+
+def sync_all_mother_statuses(cursor):
+    cursor.execute("SELECT tag_id FROM sheep")
+    for (tag_id,) in cursor.fetchall():
+        sync_mother_status(cursor, tag_id)
+
+def normalize_birth_date(birth_date):
+    birth_date = (birth_date or '').strip()
+    return birth_date or date.today().isoformat()
 
 @app.route('/')
 def index():
@@ -108,12 +126,11 @@ def add_sheep():
     name = data.get('name', '').strip()
     breed = data.get('breed', '').strip()
     sheep_type = data.get('sheep_type', '').strip()
-    birth_date = data.get('birth_date', '').strip()
+    birth_date = normalize_birth_date(data.get('birth_date', ''))
     purchase_date = data.get('purchase_date', '').strip()
     purchase_price_str = data.get('purchase_price', '').strip()
     purchase_location = data.get('purchase_location', '').strip()
     notes = data.get('notes', '').strip()
-    mother_status = data.get('mother_status', '').strip() or 'ليس أم بعد'
     mother_id = data.get('mother_id', '').strip()
     life_status = data.get('life_status', '').strip() or 'حي'
 
@@ -143,8 +160,9 @@ def add_sheep():
         cursor.execute('''
             INSERT INTO sheep (tag_id, name, breed, sheep_type, birth_date, purchase_date, purchase_price, purchase_location, notes, mother_status, mother_id, life_status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (tag_id, name, breed, sheep_type, birth_date, purchase_date, purchase_price, purchase_location, notes, mother_status, mother_id or None, life_status))
-        mark_mother_as_um(cursor, mother_id)
+        ''', (tag_id, name, breed, sheep_type, birth_date, purchase_date, purchase_price, purchase_location, notes, 'ليس أم بعد', mother_id or None, life_status))
+        sync_mother_status(cursor, tag_id)
+        sync_mother_status(cursor, mother_id)
         conn.commit()
         conn.close()
         return jsonify({"success": True, "message": "تم حفظ بيانات الخروف بنجاح!"})
@@ -160,12 +178,11 @@ def update_sheep(tag_id):
     name = data.get('name', '').strip()
     breed = data.get('breed', '').strip()
     sheep_type = data.get('sheep_type', '').strip()
-    birth_date = data.get('birth_date', '').strip()
+    birth_date = normalize_birth_date(data.get('birth_date', ''))
     purchase_date = data.get('purchase_date', '').strip()
     purchase_price_str = data.get('purchase_price', '').strip()
     purchase_location = data.get('purchase_location', '').strip()
     notes = data.get('notes', '').strip()
-    mother_status = data.get('mother_status', '').strip() or 'ليس أم بعد'
     mother_id = data.get('mother_id', '').strip()
     life_status = data.get('life_status', '').strip() or 'حي'
 
@@ -189,12 +206,22 @@ def update_sheep(tag_id):
                 conn.close()
                 return jsonify({"success": False, "message": f"رقم الأم '{mother_id}' غير موجود في السجل."}), 400
 
+        cursor.execute("SELECT mother_id FROM sheep WHERE tag_id = ?", (tag_id,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"success": False, "message": f"رقم الخروف '{tag_id}' غير موجود في السجل."}), 404
+        old_mother_id = row[0]
+
         cursor.execute('''
             UPDATE sheep
-            SET name=?, breed=?, sheep_type=?, birth_date=?, purchase_date=?, purchase_price=?, purchase_location=?, notes=?, mother_status=?, mother_id=?, life_status=?
+            SET name=?, breed=?, sheep_type=?, birth_date=?, purchase_date=?, purchase_price=?, purchase_location=?, notes=?, mother_id=?, life_status=?
             WHERE tag_id=?
-        ''', (name, breed, sheep_type, birth_date, purchase_date, purchase_price, purchase_location, notes, mother_status, mother_id or None, life_status, tag_id))
-        mark_mother_as_um(cursor, mother_id)
+        ''', (name, breed, sheep_type, birth_date, purchase_date, purchase_price, purchase_location, notes, mother_id or None, life_status, tag_id))
+        sync_mother_status(cursor, tag_id)
+        sync_mother_status(cursor, mother_id)
+        if old_mother_id and old_mother_id != (mother_id or None):
+            sync_mother_status(cursor, old_mother_id)
         conn.commit()
         conn.close()
         return jsonify({"success": True, "message": "تم تعديل بيانات الخروف بنجاح!"})
@@ -207,7 +234,11 @@ def delete_sheep(tag_id):
     try:
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
+        cursor.execute("SELECT mother_id FROM sheep WHERE tag_id = ?", (tag_id,))
+        row = cursor.fetchone()
+        mother_id = row[0] if row else None
         cursor.execute("DELETE FROM sheep WHERE tag_id=?", (tag_id,))
+        sync_mother_status(cursor, mother_id)
         conn.commit()
         conn.close()
         return jsonify({"success": True, "message": "تم حذف رأس الماشية بنجاح!"})
