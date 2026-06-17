@@ -32,10 +32,14 @@
                 <h1 class="text-3xl font-bold text-lime-700">مُتابع القطيع</h1>
                 <p class="text-stone-500 text-sm mt-1">إدارة القطيع — عرض بطاقات وتفاصيل موسّعة</p>
             </div>
-            <div id="statsBar" class="grid grid-cols-3 gap-3 text-center">
+            <div id="statsBar" class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
                 <div class="bg-white border border-stone-200 rounded-xl p-3 shadow-sm">
                     <div id="statTotal" class="text-2xl font-bold text-lime-700">0</div>
                     <div class="text-xs text-stone-500 mt-0.5">إجمالي القطيع</div>
+                </div>
+                <div class="bg-white border border-stone-200 rounded-xl p-3 shadow-sm">
+                    <div id="statPregnant" class="text-2xl font-bold text-violet-600">0</div>
+                    <div class="text-xs text-stone-500 mt-0.5">حوامل</div>
                 </div>
                 <div class="bg-white border border-stone-200 rounded-xl p-3 shadow-sm">
                     <div id="statDead" class="text-2xl font-bold text-red-600">0</div>
@@ -71,10 +75,14 @@
                 </div>
 
                 <div id="filterPanel" class="filter-panel rounded-2xl bg-stone-50 border border-stone-200/80 px-4 py-0 space-y-4 max-h-0 opacity-0 overflow-hidden">
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
                         <div>
                             <span class="text-xs font-medium text-stone-500 mb-2 block">حالة الحياة</span>
                             <div id="lifeFilters" class="flex flex-wrap gap-1.5"></div>
+                        </div>
+                        <div>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">حالة الحمل</span>
+                            <div id="pregnancyFilters" class="flex flex-wrap gap-1.5"></div>
                         </div>
                         <div>
                             <span class="text-xs font-medium text-stone-500 mb-2 block">حالة الأم</span>
@@ -238,6 +246,37 @@
         </div>
     </div>
 
+    <!-- Reproduction entry modal -->
+    <div id="reproModal" class="fixed inset-0 bg-stone-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300" onclick="closeReproModal()">
+        <div class="bg-white border border-stone-200 w-full max-w-md p-6 rounded-xl shadow-2xl relative mx-4 text-right" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between border-b border-stone-200 pb-3 mb-4">
+                <button onclick="closeReproModal()" class="text-stone-400 hover:text-stone-700 font-bold text-lg">&times;</button>
+                <h3 id="reproModalTitle" class="text-lg font-bold text-lime-700">تسجيل تلقيح</h3>
+            </div>
+            <form id="reproForm" class="space-y-4">
+                <input type="hidden" id="reproMode" value="mating">
+                <input type="hidden" id="reproTagId" value="">
+                <input type="hidden" id="reproMatingId" value="">
+                <div>
+                    <label id="reproDateLabel" class="block text-sm font-medium mb-1 text-stone-700">تاريخ التلقيح</label>
+                    <input type="date" id="reproDate" required class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                </div>
+                <div id="reproResultGroup" class="hidden">
+                    <label class="block text-sm font-medium mb-1 text-stone-700">النتيجة</label>
+                    <select id="reproResult" class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                        <option value="pass">ناجح</option>
+                        <option value="fail">فاشل</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-stone-700">ملاحظات</label>
+                    <textarea id="reproNotes" rows="3" placeholder="ملاحظات اختيارية..." class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500 text-sm resize-none"></textarea>
+                </div>
+                <button type="submit" id="reproSubmitBtn" class="w-full bg-lime-600 hover:bg-lime-700 transition font-bold py-3 px-4 rounded-lg text-white">حفظ</button>
+            </form>
+        </div>
+    </div>
+
     <!-- Toast container -->
     <div id="toastContainer" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center pointer-events-none w-full max-w-sm px-4"></div>
 
@@ -247,6 +286,7 @@
         let activeLifeFilter = '';
         let activeMotherFilter = '';
         let activeGenderFilter = '';
+        let activePregnancyFilter = '';
         let filtersExpanded = false;
         let expandedCards = new Set();
 
@@ -268,8 +308,16 @@
             { value: 'خروف', label: 'خروف' },
         ];
 
+        const PREGNANCY_FILTER_OPTIONS = [
+            { value: '', label: 'الكل' },
+            { value: 'حامل', label: 'حامل' },
+            { value: 'قيد المتابعة', label: 'قيد المتابعة' },
+            { value: 'غير حامل', label: 'غير حامل' },
+        ];
+
         document.addEventListener('DOMContentLoaded', () => {
             renderLifeFilters();
+            renderPregnancyFilters();
             renderMotherFilters();
             renderGenderFilters();
             fetchSheep();
@@ -387,6 +435,116 @@
             renderFilterGroup('motherFilters', MOTHER_FILTER_OPTIONS, activeMotherFilter, 'data-mother');
         }
 
+        function pregnancyStatusLabel(sheep) {
+            return sheep.pregnancy_status || 'غير حامل';
+        }
+
+        function matingResultLabel(result) {
+            if (result === 'pass') return 'ناجح';
+            if (result === 'fail') return 'فاشل';
+            return 'بانتظار المراجعة';
+        }
+
+        function matingResultClass(result, needsReview) {
+            if (result === 'pass') return 'bg-emerald-100 text-emerald-700';
+            if (result === 'fail') return 'bg-red-100 text-red-700';
+            if (needsReview) return 'bg-amber-100 text-amber-800';
+            return 'bg-stone-100 text-stone-600';
+        }
+
+        function ultrasoundResultClass(result) {
+            return result === 'pass' ? 'text-emerald-700' : 'text-red-600';
+        }
+
+        function renderReproductionSection(sheep) {
+            if (sheep.sheep_type !== 'حملة') return '';
+
+            const safeTag = escapeHtml(sheep.tag_id);
+            const matings = sheep.matings || [];
+            const status = pregnancyStatusLabel(sheep);
+            const statusClass = status === 'حامل'
+                ? 'bg-violet-100 text-violet-700'
+                : status === 'قيد المتابعة'
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-stone-100 text-stone-600';
+
+            let matingsHtml = '';
+            if (matings.length === 0) {
+                matingsHtml = '<p class="text-sm text-stone-500">لا توجد سجلات تلقيح بعد</p>';
+            } else {
+                matingsHtml = matings.map(m => {
+                    const resultBadge = `<span class="text-xs font-medium px-2 py-0.5 rounded-full ${matingResultClass(m.result, m.needs_review)}">${escapeHtml(matingResultLabel(m.result))}${m.needs_review ? ' (20+ يوم)' : ''}</span>`;
+                    const notesLine = m.notes ? `<p class="text-xs text-stone-500 mt-1">${escapeHtml(m.notes)}</p>` : '';
+                    const completedLine = m.completed_at ? `<p class="text-xs text-stone-400 mt-1">دورة مغلقة</p>` : '';
+
+                    let actionsHtml = '';
+                    if (!m.result) {
+                        actionsHtml = `
+                            <div class="flex flex-wrap gap-2 mt-2 justify-end">
+                                <button data-action="mating-pass" data-id="${m.id}" class="text-xs font-semibold px-2.5 py-1 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition">نجاح</button>
+                                <button data-action="mating-fail" data-id="${m.id}" class="text-xs font-semibold px-2.5 py-1 rounded-md bg-red-600 text-white hover:bg-red-700 transition">فشل</button>
+                            </div>`;
+                    } else if (m.result === 'pass' && !m.completed_at) {
+                        actionsHtml = `
+                            <div class="flex flex-wrap gap-2 mt-2 justify-end">
+                                <button data-action="add-ultrasound" data-id="${m.id}" data-tag="${safeTag}" class="text-xs font-semibold px-2.5 py-1 rounded-md bg-violet-600 text-white hover:bg-violet-700 transition">+ سونار</button>
+                                ${status === 'حامل' ? `<button data-action="complete-mating" data-id="${m.id}" class="text-xs font-medium px-2.5 py-1 rounded-md text-stone-600 hover:bg-stone-100 transition">إغلاق الدورة</button>` : ''}
+                            </div>`;
+                    }
+
+                    const deleteBtn = `<button data-action="delete-mating" data-id="${m.id}" class="text-xs font-medium px-2.5 py-1 rounded-md text-stone-500 hover:text-red-600 hover:bg-red-50 transition">حذف</button>`;
+
+                    let ultrasoundsHtml = '';
+                    if (m.result === 'pass' && m.ultrasounds && m.ultrasounds.length) {
+                        ultrasoundsHtml = `
+                            <div class="mt-2 mr-2 pr-3 border-r-2 border-violet-200 space-y-2">
+                                <div class="text-xs font-bold text-stone-500">سونار</div>
+                                ${m.ultrasounds.map(u => `
+                                    <div class="text-sm flex justify-between gap-2 items-start">
+                                        <button data-action="delete-ultrasound" data-id="${u.id}" class="text-stone-400 hover:text-red-600 text-xs shrink-0" title="حذف">×</button>
+                                        <div class="flex-1 text-right">
+                                            <span class="font-medium">${escapeHtml(u.scan_date)}</span>
+                                            <span class="text-xs font-semibold mr-2 ${ultrasoundResultClass(u.result)}">${u.result === 'pass' ? 'ناجح' : 'فاشل'}</span>
+                                            ${u.notes ? `<p class="text-xs text-stone-500 mt-0.5">${escapeHtml(u.notes)}</p>` : ''}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>`;
+                    }
+
+                    return `
+                        <div class="border border-stone-200 rounded-lg p-3 bg-stone-50/80">
+                            <div class="flex justify-between items-center gap-2">
+                                <div class="flex items-center gap-2 flex-wrap min-w-0">
+                                    <div class="text-sm font-semibold text-stone-800 shrink-0">تلقيح ${escapeHtml(m.mated_date)}</div>
+                                    ${resultBadge}
+                                </div>
+                                ${deleteBtn}
+                            </div>
+                            ${notesLine || completedLine ? `<div class="mt-1 text-right">${notesLine}${completedLine}</div>` : ''}
+                            ${ultrasoundsHtml}
+                            ${actionsHtml}
+                        </div>`;
+                }).join('');
+            }
+
+            return `
+                <div class="bg-white rounded-lg p-3 border border-stone-200 h-full">
+                    <div class="flex justify-between items-center gap-2 mb-3">
+                        <div class="text-right flex-1">
+                            <div class="text-xs font-bold text-stone-500">سجل التلقيح والحمل</div>
+                            <span class="text-xs font-medium px-2 py-0.5 rounded-full inline-block mt-1 ${statusClass}">${escapeHtml(status)}</span>
+                        </div>
+                        <button data-action="add-mating" data-tag="${safeTag}" class="text-xs font-semibold px-2.5 py-1 rounded-md bg-lime-600 text-white hover:bg-lime-700 transition shrink-0">+ تلقيح</button>
+                    </div>
+                    <div class="space-y-2">${matingsHtml}</div>
+                </div>`;
+        }
+
+        function renderPregnancyFilters() {
+            renderFilterGroup('pregnancyFilters', PREGNANCY_FILTER_OPTIONS, activePregnancyFilter, 'data-pregnancy');
+        }
+
         function renderGenderFilters() {
             renderFilterGroup('genderFilters', GENDER_FILTER_OPTIONS, activeGenderFilter, 'data-gender');
         }
@@ -480,12 +638,13 @@
         }
 
         function hasActiveFilters() {
-            return !!(activeBreedFilter || activeLifeFilter || activeMotherFilter || activeGenderFilter || hasAgeFilter() || document.getElementById('searchBar').value.trim());
+            return !!(activeBreedFilter || activeLifeFilter || activeMotherFilter || activeGenderFilter || activePregnancyFilter || hasAgeFilter() || document.getElementById('searchBar').value.trim());
         }
 
         function getActiveFilterSummary() {
             const parts = [];
             if (activeLifeFilter) parts.push(activeLifeFilter);
+            if (activePregnancyFilter) parts.push(activePregnancyFilter);
             if (activeMotherFilter) parts.push(activeMotherFilter);
             if (activeGenderFilter) parts.push(activeGenderFilter);
             const ageLabel = getAgeFilterSummaryLabel();
@@ -517,10 +676,12 @@
             activeLifeFilter = '';
             activeMotherFilter = '';
             activeGenderFilter = '';
+            activePregnancyFilter = '';
             document.getElementById('ageFilterMin').value = '';
             document.getElementById('ageFilterMax').value = '';
             document.getElementById('ageFilterUnit').value = 'months';
             renderLifeFilters();
+            renderPregnancyFilters();
             renderMotherFilters();
             renderGenderFilters();
             renderBreedFilters();
@@ -625,7 +786,9 @@
         function updateStats() {
             const mothers = allSheep.filter(s => s.mother_status === 'أم').length;
             const dead = allSheep.filter(s => s.life_status === 'ميت').length;
+            const pregnant = allSheep.filter(s => pregnancyStatusLabel(s) === 'حامل').length;
             document.getElementById('statTotal').textContent = allSheep.length;
+            document.getElementById('statPregnant').textContent = pregnant;
             document.getElementById('statDead').textContent = dead;
             document.getElementById('statMothers').textContent = mothers;
         }
@@ -665,6 +828,12 @@
             applyFilters();
         }
 
+        function setPregnancyFilter(value) {
+            activePregnancyFilter = value;
+            renderPregnancyFilters();
+            applyFilters();
+        }
+
         function applyFilters() {
             const query = document.getElementById('searchBar').value.trim().toLowerCase();
             let filtered = allSheep;
@@ -680,6 +849,9 @@
             }
             if (activeGenderFilter) {
                 filtered = filtered.filter(s => s.sheep_type === activeGenderFilter);
+            }
+            if (activePregnancyFilter) {
+                filtered = filtered.filter(s => pregnancyStatusLabel(s) === activePregnancyFilter);
             }
             if (hasAgeFilter()) {
                 filtered = filtered.filter(s => matchesAgeFilter(s));
@@ -728,10 +900,21 @@
                 const { live: liveChildren, dead: deadChildren, total: childCount } = getChildCounts(s.tag_id);
                 const children = getChildren(s.tag_id);
                 const isDead = s.life_status === 'ميت';
-                const metaHtml = (s.sheep_type || s.breed || s.life_status)
+                const pregStatus = pregnancyStatusLabel(s);
+                const reviewBadge = s.needs_mating_review
+                    ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">مراجعة تلقيح</span>`
+                    : '';
+                const pregnantBadge = pregStatus === 'حامل'
+                    ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">حامل</span>`
+                    : pregStatus === 'قيد المتابعة'
+                        ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">قيد المتابعة</span>`
+                        : '';
+                const metaHtml = (s.sheep_type || s.breed || s.life_status || pregnantBadge || reviewBadge)
                     ? `<div class="text-stone-500 text-sm mt-0.5 flex items-center gap-2 flex-wrap justify-start">
                         ${s.life_status === 'ميت' ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-red-600 text-white">ميت</span>` : `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">حي</span>`}
                         ${s.sheep_type ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full ${s.sheep_type === 'حملة' ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700'}">${escapeHtml(s.sheep_type)}</span>` : ''}
+                        ${pregnantBadge}
+                        ${reviewBadge}
                         <span class="text-xs font-medium px-2 py-0.5 rounded-full ${s.breed && s.breed.trim() ? 'bg-lime-100 text-lime-700' : 'bg-stone-100 text-stone-500'}">${escapeHtml(breedLabel(s.breed))}</span>
                        </div>`
                     : '';
@@ -752,6 +935,36 @@
                     ? `<p class="text-sm text-stone-600 line-clamp-2 leading-relaxed mb-2">${escapeHtml(s.notes.slice(0, 120))}${s.notes.length > 120 ? '…' : ''}</p>
                        <button data-action="notes" data-tag="${safeTag}" class="text-lime-700 hover:text-lime-800 text-xs font-semibold transition">عرض السجل الكامل ←</button>`
                     : `<span class="text-sm text-stone-500">لا توجد ملاحظات</span>`;
+
+                const detailsColumn = `
+                    <div class="space-y-4 min-w-0">
+                        ${s.name ? `<div class="flex justify-between text-sm"><span class="text-stone-500">اسم الخروف</span><span>${escapeHtml(s.name)}</span></div>` : ''}
+                        ${birthRow}
+                        ${s.sheep_type ? `<div class="flex justify-between text-sm"><span class="text-stone-500">جنس الخروف</span><span>${escapeHtml(s.sheep_type)}</span></div>` : ''}
+                        ${s.life_status ? `<div class="flex justify-between text-sm"><span class="text-stone-500">حالة الحياة</span><span>${escapeHtml(s.life_status)}</span></div>` : ''}
+                        ${s.sheep_type === 'حملة' ? `<div class="flex justify-between text-sm"><span class="text-stone-500">حالة الحمل</span><span>${escapeHtml(pregStatus)}</span></div>` : ''}
+                        ${s.breed !== undefined ? `<div class="flex justify-between text-sm"><span class="text-stone-500">سلالة الخروف</span><span>${escapeHtml(breedLabel(s.breed))}</span></div>` : ''}
+                        <div class="flex justify-between text-sm"><span class="text-stone-500">حالة الأم</span><span>${motherStatusLabel(s)}</span></div>
+                        ${childCount > 0 ? `
+                            ${liveChildren > 0 ? `<div class="flex justify-between text-sm"><span class="text-stone-500">أبناء أحياء</span><span>${childCountLabel(liveChildren)}</span></div>` : ''}
+                            ${deadChildren > 0 ? `<div class="flex justify-between text-sm"><span class="text-stone-500">أبناء أموات</span><span>${childCountLabel(deadChildren)}</span></div>` : ''}
+                        ` : ''}
+                        ${children.length ? `<div class="text-sm"><span class="text-stone-500 block mb-1">أرقام الأبناء</span><span class="text-stone-800">${children.map(c => escapeHtml(c.tag_id)).join(' · ')}</span></div>` : ''}
+                        ${s.mother_id ? `<div class="flex justify-between text-sm"><span class="text-stone-500">رقم الأم</span><span>${escapeHtml(s.mother_id)}</span></div>` : `<div class="flex justify-between text-sm"><span class="text-stone-500">رقم الأم</span><span>غير محدد</span></div>`}
+                        <div class="bg-white rounded-lg p-3 border border-stone-200">${purchaseRows}</div>
+                        <div class="bg-white rounded-lg p-3 border border-stone-200">
+                            <div class="text-xs font-bold text-stone-500 mb-2">الملاحظات والسجل</div>
+                            ${notesPreview}
+                        </div>
+                    </div>`;
+
+                const reproSection = renderReproductionSection(s);
+                const expandedBody = reproSection
+                    ? `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                        <div class="min-w-0 order-2 lg:order-1">${reproSection}</div>
+                        <div class="min-w-0 order-1 lg:order-2">${detailsColumn}</div>
+                       </div>`
+                    : detailsColumn;
 
                 return `
                 <div class="border border-stone-200 rounded-lg overflow-hidden bg-white ${isDead ? 'opacity-75' : ''}" data-tag="${safeTag}">
@@ -774,25 +987,9 @@
                             </div>
                         </div>
                     </div>
-                    <div class="card-details overflow-hidden border-t border-stone-200 ${isExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}">
-                        <div class="p-4 space-y-4 bg-stone-50 text-right">
-                            ${s.name ? `<div class="flex justify-between text-sm"><span class="text-stone-500">اسم الخروف</span><span>${escapeHtml(s.name)}</span></div>` : ''}
-                            ${birthRow}
-                            ${s.sheep_type ? `<div class="flex justify-between text-sm"><span class="text-stone-500">جنس الخروف</span><span>${escapeHtml(s.sheep_type)}</span></div>` : ''}
-                            ${s.life_status ? `<div class="flex justify-between text-sm"><span class="text-stone-500">حالة الحياة</span><span>${escapeHtml(s.life_status)}</span></div>` : ''}
-                            ${s.breed !== undefined ? `<div class="flex justify-between text-sm"><span class="text-stone-500">سلالة الخروف</span><span>${escapeHtml(breedLabel(s.breed))}</span></div>` : ''}
-                            <div class="flex justify-between text-sm"><span class="text-stone-500">حالة الأم</span><span>${motherStatusLabel(s)}</span></div>
-                            ${childCount > 0 ? `
-                                ${liveChildren > 0 ? `<div class="flex justify-between text-sm"><span class="text-stone-500">أبناء أحياء</span><span>${childCountLabel(liveChildren)}</span></div>` : ''}
-                                ${deadChildren > 0 ? `<div class="flex justify-between text-sm"><span class="text-stone-500">أبناء أموات</span><span>${childCountLabel(deadChildren)}</span></div>` : ''}
-                            ` : ''}
-                            ${children.length ? `<div class="text-sm"><span class="text-stone-500 block mb-1">أرقام الأبناء</span><span class="text-stone-800">${children.map(c => escapeHtml(c.tag_id)).join(' · ')}</span></div>` : ''}
-                            ${s.mother_id ? `<div class="flex justify-between text-sm"><span class="text-stone-500">رقم الأم</span><span>${escapeHtml(s.mother_id)}</span></div>` : `<div class="flex justify-between text-sm"><span class="text-stone-500">رقم الأم</span><span>غير محدد</span></div>`}
-                            <div class="bg-white rounded-lg p-3 border border-stone-200">${purchaseRows}</div>
-                            <div class="bg-white rounded-lg p-3 border border-stone-200">
-                                <div class="text-xs font-bold text-stone-500 mb-2">الملاحظات والسجل</div>
-                                ${notesPreview}
-                            </div>
+                    <div class="card-details overflow-hidden border-t border-stone-200 ${isExpanded ? 'max-h-[1200px] opacity-100' : 'max-h-0 opacity-0'}">
+                        <div class="p-4 bg-stone-50 text-right">
+                            ${expandedBody}
                         </div>
                     </div>
                 </div>`;
@@ -824,6 +1021,94 @@
             const modal = document.getElementById('notesModal');
             modal.classList.add('opacity-0');
             setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function openReproModal(mode, tagId, matingId = '') {
+            document.getElementById('reproMode').value = mode;
+            document.getElementById('reproTagId').value = tagId;
+            document.getElementById('reproMatingId').value = matingId;
+            document.getElementById('reproDate').value = todayDateString();
+            document.getElementById('reproNotes').value = '';
+
+            const resultGroup = document.getElementById('reproResultGroup');
+            const title = document.getElementById('reproModalTitle');
+            const dateLabel = document.getElementById('reproDateLabel');
+            const submitBtn = document.getElementById('reproSubmitBtn');
+
+            if (mode === 'ultrasound') {
+                title.innerText = 'تسجيل سونار';
+                dateLabel.innerText = 'تاريخ السونار';
+                resultGroup.classList.remove('hidden');
+                submitBtn.innerText = 'حفظ السونار';
+                submitBtn.className = 'w-full bg-violet-600 hover:bg-violet-700 transition font-bold py-3 px-4 rounded-lg text-white';
+            } else {
+                title.innerText = 'تسجيل تلقيح';
+                dateLabel.innerText = 'تاريخ التلقيح';
+                resultGroup.classList.add('hidden');
+                submitBtn.innerText = 'حفظ التلقيح';
+                submitBtn.className = 'w-full bg-lime-600 hover:bg-lime-700 transition font-bold py-3 px-4 rounded-lg text-white';
+            }
+
+            const modal = document.getElementById('reproModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        }
+
+        function closeReproModal() {
+            const modal = document.getElementById('reproModal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        async function setMatingResult(matingId, result) {
+            try {
+                const response = await fetch(`/api/matings/${matingId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ result }),
+                });
+                const data = await response.json();
+                showToast(data.message, data.success !== false ? 'success' : 'error');
+                if (data.success !== false) fetchSheep();
+            } catch (err) {
+                showToast('تعذر تحديث نتيجة التلقيح', 'error');
+            }
+        }
+
+        async function deleteMating(matingId) {
+            if (!confirm('هل أنت متأكد من حذف سجل التلقيح؟')) return;
+            try {
+                const response = await fetch(`/api/matings/${matingId}`, { method: 'DELETE' });
+                const data = await response.json();
+                showToast(data.message, data.success !== false ? 'success' : 'error');
+                if (data.success !== false) fetchSheep();
+            } catch (err) {
+                showToast('تعذر حذف سجل التلقيح', 'error');
+            }
+        }
+
+        async function completeMating(matingId) {
+            if (!confirm('إغلاق دورة الحمل؟ (مثلاً بعد الولادة)')) return;
+            try {
+                const response = await fetch(`/api/matings/${matingId}/complete`, { method: 'POST' });
+                const data = await response.json();
+                showToast(data.message, data.success !== false ? 'success' : 'error');
+                if (data.success !== false) fetchSheep();
+            } catch (err) {
+                showToast('تعذر إغلاق دورة الحمل', 'error');
+            }
+        }
+
+        async function deleteUltrasound(ultrasoundId) {
+            if (!confirm('هل أنت متأكد من حذف سجل السونار؟')) return;
+            try {
+                const response = await fetch(`/api/ultrasounds/${ultrasoundId}`, { method: 'DELETE' });
+                const data = await response.json();
+                showToast(data.message, data.success !== false ? 'success' : 'error');
+                if (data.success !== false) fetchSheep();
+            } catch (err) {
+                showToast('تعذر حذف سجل السونار', 'error');
+            }
         }
 
         function startEdit(tagId) {
@@ -910,6 +1195,11 @@
             if (chip) setGenderFilter(chip.getAttribute('data-gender') || '');
         });
 
+        document.getElementById('pregnancyFilters').addEventListener('click', (e) => {
+            const chip = e.target.closest('[data-pregnancy]');
+            if (chip) setPregnancyFilter(chip.getAttribute('data-pregnancy') || '');
+        });
+
         ['ageFilterMin', 'ageFilterMax', 'ageFilterUnit'].forEach(id => {
             document.getElementById(id).addEventListener('input', applyFilters);
             document.getElementById(id).addEventListener('change', applyFilters);
@@ -921,9 +1211,17 @@
                 e.stopPropagation();
                 const tag = actionBtn.dataset.tag;
                 const action = actionBtn.dataset.action;
+                const id = actionBtn.dataset.id;
                 if (action === 'edit') startEdit(tag);
                 else if (action === 'delete') deleteSheep(tag);
                 else if (action === 'notes') openNotesModal(tag);
+                else if (action === 'add-mating') openReproModal('mating', tag);
+                else if (action === 'add-ultrasound') openReproModal('ultrasound', tag, id);
+                else if (action === 'mating-pass') setMatingResult(id, 'pass');
+                else if (action === 'mating-fail') setMatingResult(id, 'fail');
+                else if (action === 'delete-mating') deleteMating(id);
+                else if (action === 'complete-mating') completeMating(id);
+                else if (action === 'delete-ultrasound') deleteUltrasound(id);
                 return;
             }
             const header = e.target.closest('.card-header');
@@ -982,6 +1280,46 @@
                 }
             } catch (error) {
                 showToast('تعذر حفظ البيانات', 'error');
+            }
+        });
+
+        document.getElementById('reproForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const mode = document.getElementById('reproMode').value;
+            const tagId = document.getElementById('reproTagId').value;
+            const matingId = document.getElementById('reproMatingId').value;
+            const payload = {
+                scan_date: document.getElementById('reproDate').value,
+                mated_date: document.getElementById('reproDate').value,
+                notes: document.getElementById('reproNotes').value,
+            };
+
+            let url;
+            if (mode === 'ultrasound') {
+                url = `/api/matings/${matingId}/ultrasounds`;
+                payload.result = document.getElementById('reproResult').value;
+                delete payload.mated_date;
+            } else {
+                url = `/api/sheep/${tagId}/matings`;
+                delete payload.scan_date;
+                delete payload.result;
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await response.json();
+                showToast(result.message, result.success !== false ? 'success' : 'error');
+                if (result.success !== false) {
+                    closeReproModal();
+                    expandedCards.add(tagId);
+                    fetchSheep();
+                }
+            } catch (err) {
+                showToast('تعذر حفظ السجل', 'error');
             }
         });
     </script>
