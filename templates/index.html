@@ -531,9 +531,9 @@
             return `
                 <div class="bg-white rounded-lg p-3 border border-stone-200 h-full">
                     <div class="flex justify-between items-center gap-2 mb-3">
-                        <div class="text-right flex-1">
-                            <div class="text-xs font-bold text-stone-500">سجل التلقيح والحمل</div>
-                            <span class="text-xs font-medium px-2 py-0.5 rounded-full inline-block mt-1 ${statusClass}">${escapeHtml(status)}</span>
+                        <div class="text-right flex-1 flex items-center gap-2 flex-wrap justify-start">
+                            <div class="text-xs font-bold text-stone-500">التلقيح والحمل</div>
+                            <span class="text-xs font-medium px-2 py-0.5 rounded-full ${statusClass}">${escapeHtml(status)}</span>
                         </div>
                         <button data-action="add-mating" data-tag="${safeTag}" class="text-xs font-semibold px-2.5 py-1 rounded-md bg-lime-600 text-white hover:bg-lime-700 transition shrink-0">+ تلقيح</button>
                     </div>
@@ -900,24 +900,6 @@
                 const { live: liveChildren, dead: deadChildren, total: childCount } = getChildCounts(s.tag_id);
                 const children = getChildren(s.tag_id);
                 const isDead = s.life_status === 'ميت';
-                const pregStatus = pregnancyStatusLabel(s);
-                const reviewBadge = s.needs_mating_review
-                    ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">مراجعة تلقيح</span>`
-                    : '';
-                const pregnantBadge = pregStatus === 'حامل'
-                    ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">حامل</span>`
-                    : pregStatus === 'قيد المتابعة'
-                        ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">قيد المتابعة</span>`
-                        : '';
-                const metaHtml = (s.sheep_type || s.breed || s.life_status || pregnantBadge || reviewBadge)
-                    ? `<div class="text-stone-500 text-sm mt-0.5 flex items-center gap-2 flex-wrap justify-start">
-                        ${s.life_status === 'ميت' ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-red-600 text-white">ميت</span>` : `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">حي</span>`}
-                        ${s.sheep_type ? `<span class="text-xs font-medium px-2 py-0.5 rounded-full ${s.sheep_type === 'حملة' ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700'}">${escapeHtml(s.sheep_type)}</span>` : ''}
-                        ${pregnantBadge}
-                        ${reviewBadge}
-                        <span class="text-xs font-medium px-2 py-0.5 rounded-full ${s.breed && s.breed.trim() ? 'bg-lime-100 text-lime-700' : 'bg-stone-100 text-stone-500'}">${escapeHtml(breedLabel(s.breed))}</span>
-                       </div>`
-                    : '';
 
                 const birthRow = s.birth_date
                     ? `<div class="flex justify-between text-sm"><span class="text-stone-500">تاريخ الولادة</span><span>${escapeHtml(s.birth_date)}</span></div>
@@ -936,13 +918,11 @@
                        <button data-action="notes" data-tag="${safeTag}" class="text-lime-700 hover:text-lime-800 text-xs font-semibold transition">عرض السجل الكامل ←</button>`
                     : `<span class="text-sm text-stone-500">لا توجد ملاحظات</span>`;
 
-                const detailsColumn = `
-                    <div class="space-y-4 min-w-0">
+                const detailsRows = `
                         ${s.name ? `<div class="flex justify-between text-sm"><span class="text-stone-500">اسم الخروف</span><span>${escapeHtml(s.name)}</span></div>` : ''}
                         ${birthRow}
                         ${s.sheep_type ? `<div class="flex justify-between text-sm"><span class="text-stone-500">جنس الخروف</span><span>${escapeHtml(s.sheep_type)}</span></div>` : ''}
                         ${s.life_status ? `<div class="flex justify-between text-sm"><span class="text-stone-500">حالة الحياة</span><span>${escapeHtml(s.life_status)}</span></div>` : ''}
-                        ${s.sheep_type === 'حملة' ? `<div class="flex justify-between text-sm"><span class="text-stone-500">حالة الحمل</span><span>${escapeHtml(pregStatus)}</span></div>` : ''}
                         ${s.breed !== undefined ? `<div class="flex justify-between text-sm"><span class="text-stone-500">سلالة الخروف</span><span>${escapeHtml(breedLabel(s.breed))}</span></div>` : ''}
                         <div class="flex justify-between text-sm"><span class="text-stone-500">حالة الأم</span><span>${motherStatusLabel(s)}</span></div>
                         ${childCount > 0 ? `
@@ -950,21 +930,19 @@
                             ${deadChildren > 0 ? `<div class="flex justify-between text-sm"><span class="text-stone-500">أبناء أموات</span><span>${childCountLabel(deadChildren)}</span></div>` : ''}
                         ` : ''}
                         ${children.length ? `<div class="text-sm"><span class="text-stone-500 block mb-1">أرقام الأبناء</span><span class="text-stone-800">${children.map(c => escapeHtml(c.tag_id)).join(' · ')}</span></div>` : ''}
-                        ${s.mother_id ? `<div class="flex justify-between text-sm"><span class="text-stone-500">رقم الأم</span><span>${escapeHtml(s.mother_id)}</span></div>` : `<div class="flex justify-between text-sm"><span class="text-stone-500">رقم الأم</span><span>غير محدد</span></div>`}
+                        ${s.mother_id ? `<div class="flex justify-between text-sm"><span class="text-stone-500">رقم الأم</span><span>${escapeHtml(s.mother_id)}</span></div>` : `<div class="flex justify-between text-sm"><span class="text-stone-500">رقم الأم</span><span>غير محدد</span></div>`}`;
+
+                const reproSection = renderReproductionSection(s);
+                const expandedBody = `
+                    <div class="space-y-4 min-w-0">
+                        ${detailsRows}
                         <div class="bg-white rounded-lg p-3 border border-stone-200">${purchaseRows}</div>
+                        ${reproSection}
                         <div class="bg-white rounded-lg p-3 border border-stone-200">
                             <div class="text-xs font-bold text-stone-500 mb-2">الملاحظات والسجل</div>
                             ${notesPreview}
                         </div>
                     </div>`;
-
-                const reproSection = renderReproductionSection(s);
-                const expandedBody = reproSection
-                    ? `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-                        <div class="min-w-0 order-2 lg:order-1">${reproSection}</div>
-                        <div class="min-w-0 order-1 lg:order-2">${detailsColumn}</div>
-                       </div>`
-                    : detailsColumn;
 
                 return `
                 <div class="border border-stone-200 rounded-lg overflow-hidden bg-white ${isDead ? 'opacity-75' : ''}" data-tag="${safeTag}">
@@ -983,7 +961,6 @@
                                 <div class="flex items-baseline gap-2 flex-wrap justify-start">
                                     <span class="text-xl font-semibold text-stone-900">${safeTag}</span>
                                 </div>
-                                ${metaHtml}
                             </div>
                         </div>
                     </div>
