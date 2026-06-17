@@ -6,9 +6,14 @@ app = Flask(__name__)
 DB_NAME = "farm_data.db"
 MATING_REVIEW_DAYS = 20
 
+def get_connection():
+    conn = sqlite3.connect(DB_NAME)
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
 def init_db():
     """Initializes the database with the expanded farm metrics spec sheet."""
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS sheep (
@@ -69,6 +74,9 @@ def init_db():
     cursor.execute("UPDATE sheep SET life_status = 'حي' WHERE life_status IS NULL OR life_status = ''")
     sync_all_mother_statuses(cursor)
     sync_all_pregnancy_statuses(cursor)
+    cursor.execute(
+        "DELETE FROM matings WHERE sheep_tag_id NOT IN (SELECT tag_id FROM sheep)"
+    )
     conn.commit()
     conn.close()
 
@@ -119,6 +127,12 @@ SHEEP_SELECT = """
            pregnancy_status
     FROM sheep
 """
+
+def delete_reproduction_for_sheep(cursor, tag_id):
+    """Remove mating/ultrasound history for a sheep."""
+    if not tag_id:
+        return
+    cursor.execute("DELETE FROM matings WHERE sheep_tag_id = ?", (tag_id,))
 
 def sync_mother_status(cursor, tag_id):
     """Set mother_status from whether this sheep actually has children."""
@@ -293,7 +307,7 @@ def index():
 @app.route('/api/breeds', methods=['GET'])
 def get_breeds():
     """Fetches unique breeds currently in the database to populate the auto-suggest list."""
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT DISTINCT breed FROM sheep WHERE breed IS NOT NULL AND breed != ''")
     breeds = [row[0] for row in cursor.fetchall()]
@@ -303,7 +317,7 @@ def get_breeds():
 @app.route('/api/sheep', methods=['GET'])
 def get_sheep():
     """Fetches all sheep records with reproduction history."""
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(SHEEP_SELECT)
     rows = cursor.fetchall()
@@ -344,7 +358,7 @@ def add_sheep():
             return jsonify({"success": False, "message": "يجب أن يكون سعر الشراء رقماً صحيحاً."}), 400
 
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = get_connection()
         cursor = conn.cursor()
 
         if mother_id:
@@ -395,7 +409,7 @@ def update_sheep(tag_id):
             return jsonify({"success": False, "message": "يجب أن يكون سعر الشراء رقماً صحيحاً."}), 400
 
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = get_connection()
         cursor = conn.cursor()
 
         if mother_id:
@@ -435,11 +449,12 @@ def update_sheep(tag_id):
 def delete_sheep(tag_id):
     """Deletes a sheep record matching the tag_id."""
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT mother_id FROM sheep WHERE tag_id = ?", (tag_id,))
         row = cursor.fetchone()
         mother_id = row[0] if row else None
+        delete_reproduction_for_sheep(cursor, tag_id)
         cursor.execute("DELETE FROM sheep WHERE tag_id=?", (tag_id,))
         sync_mother_status(cursor, mother_id)
         conn.commit()
@@ -460,7 +475,7 @@ def add_mating(tag_id):
         return jsonify({"success": False, "message": "تاريخ التلقيح غير صالح."}), 400
 
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = get_connection()
         cursor = conn.cursor()
         ok, message = validate_ewe_for_mating(cursor, tag_id)
         if not ok:
@@ -488,7 +503,7 @@ def update_mating(mating_id):
         return jsonify({"success": False, "message": "النتيجة يجب أن تكون pass أو fail."}), 400
 
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = get_connection()
         cursor = conn.cursor()
         row = get_mating_or_404(cursor, mating_id)
         if not row:
@@ -519,7 +534,7 @@ def update_mating(mating_id):
 @app.route('/api/matings/<int:mating_id>', methods=['DELETE'])
 def delete_mating(mating_id):
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = get_connection()
         cursor = conn.cursor()
         row = get_mating_or_404(cursor, mating_id)
         if not row:
@@ -538,7 +553,7 @@ def delete_mating(mating_id):
 def complete_mating(mating_id):
     """Manually close a pregnancy cycle."""
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = get_connection()
         cursor = conn.cursor()
         row = get_mating_or_404(cursor, mating_id)
         if not row:
@@ -573,7 +588,7 @@ def add_ultrasound(mating_id):
         return jsonify({"success": False, "message": "النتيجة يجب أن تكون pass أو fail."}), 400
 
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = get_connection()
         cursor = conn.cursor()
         row = get_mating_or_404(cursor, mating_id)
         if not row:
@@ -608,7 +623,7 @@ def update_ultrasound(ultrasound_id):
         return jsonify({"success": False, "message": "تاريخ السونار غير صالح."}), 400
 
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute('''
             SELECT u.id, u.mating_id, m.sheep_tag_id
@@ -652,7 +667,7 @@ def update_ultrasound(ultrasound_id):
 @app.route('/api/ultrasounds/<int:ultrasound_id>', methods=['DELETE'])
 def delete_ultrasound(ultrasound_id):
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute('''
             SELECT u.id, m.sheep_tag_id
