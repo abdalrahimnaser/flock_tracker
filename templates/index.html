@@ -39,7 +39,7 @@
                 </div>
                 <div class="bg-white border border-stone-200 rounded-xl p-3 shadow-sm">
                     <div id="statPregnant" class="text-2xl font-bold text-violet-600">0</div>
-                    <div class="text-xs text-stone-500 mt-0.5">حوامل</div>
+                    <div class="text-xs text-stone-500 mt-0.5">حامل</div>
                 </div>
                 <div class="bg-white border border-stone-200 rounded-xl p-3 shadow-sm">
                     <div id="statDead" class="text-2xl font-bold text-red-600">0</div>
@@ -81,7 +81,7 @@
                             <div id="lifeFilters" class="flex flex-wrap gap-1.5"></div>
                         </div>
                         <div>
-                            <span class="text-xs font-medium text-stone-500 mb-2 block">حالة الحمل</span>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">التلقيح والحمل</span>
                             <div id="pregnancyFilters" class="flex flex-wrap gap-1.5"></div>
                         </div>
                         <div>
@@ -189,15 +189,19 @@
                     <input type="date" id="birth_date" class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
                 </div>
                 <div class="p-3 bg-stone-50 rounded-lg border border-stone-200 space-y-3">
-                    <span class="block text-xs font-bold text-stone-500">حالة الأمومة</span>
-                    <div>
-                        <label class="block text-xs font-medium mb-1 text-stone-500">رقم الأم</label>
-                        <select id="mother_id" class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
-                            <option value="">غير محدد</option>
-                        </select>
+                    <span class="block text-xs font-bold text-stone-500">مصدر الخروف</span>
+                    <div class="flex flex-wrap gap-2">
+                        <label class="flex-1 min-w-[140px] cursor-pointer">
+                            <input type="radio" name="sheep_origin" value="farm" class="peer sr-only" checked>
+                            <span class="block text-center text-sm font-medium px-3 py-2 rounded-lg border transition peer-checked:bg-lime-600 peer-checked:text-white peer-checked:border-lime-600 border-stone-300 text-stone-700 hover:bg-stone-100">مولود في المزرعة</span>
+                        </label>
+                        <label class="flex-1 min-w-[140px] cursor-pointer">
+                            <input type="radio" name="sheep_origin" value="external" class="peer sr-only">
+                            <span class="block text-center text-sm font-medium px-3 py-2 rounded-lg border transition peer-checked:bg-lime-600 peer-checked:text-white peer-checked:border-lime-600 border-stone-300 text-stone-700 hover:bg-stone-100">مشتري من الخارج</span>
+                        </label>
                     </div>
                 </div>
-                <div class="p-3 bg-stone-50 rounded-lg border border-stone-200 space-y-3">
+                <div id="purchaseFields" class="p-3 bg-stone-50 rounded-lg border border-stone-200 space-y-3 hidden">
                     <span class="block text-xs font-bold text-stone-500">بيانات الشراء</span>
                     <div>
                         <label class="block text-xs font-medium mb-1 text-stone-500">تاريخ الشراء</label>
@@ -210,6 +214,15 @@
                     <div>
                         <label class="block text-xs font-medium mb-1 text-stone-500">مكان الشراء</label>
                         <input type="text" id="purchase_location" class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                    </div>
+                </div>
+                <div class="p-3 bg-stone-50 rounded-lg border border-stone-200 space-y-3">
+                    <span class="block text-xs font-bold text-stone-500">حالة الأمومة</span>
+                    <div>
+                        <label class="block text-xs font-medium mb-1 text-stone-500">رقم الأم</label>
+                        <select id="mother_id" class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                            <option value="">غير محدد</option>
+                        </select>
                     </div>
                 </div>
                 <div>
@@ -310,9 +323,9 @@
 
         const PREGNANCY_FILTER_OPTIONS = [
             { value: '', label: 'الكل' },
-            { value: 'حامل', label: 'حامل' },
-            { value: 'قيد المتابعة', label: 'قيد المتابعة' },
             { value: 'غير حامل', label: 'غير حامل' },
+            { value: 'انتظار السونار', label: 'انتظار السونار' },
+            { value: 'حامل', label: 'حامل' },
         ];
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -322,6 +335,10 @@
             renderGenderFilters();
             fetchSheep();
             fetchBreeds();
+            document.querySelectorAll('input[name="sheep_origin"]').forEach(radio => {
+                radio.addEventListener('change', updatePurchaseFieldsVisibility);
+            });
+            updatePurchaseFieldsVisibility();
         });
 
         function escapeHtml(str) {
@@ -439,6 +456,12 @@
             return sheep.pregnancy_status || 'غير حامل';
         }
 
+        function reproStatusClass(status) {
+            if (status === 'حامل') return 'bg-violet-100 text-violet-700';
+            if (status === 'انتظار السونار') return 'bg-amber-100 text-amber-700';
+            return 'bg-stone-100 text-stone-600';
+        }
+
         function matingResultLabel(result) {
             if (result === 'pass') return 'ناجح';
             if (result === 'fail') return 'فاشل';
@@ -462,11 +485,7 @@
             const safeTag = escapeHtml(sheep.tag_id);
             const matings = sheep.matings || [];
             const status = pregnancyStatusLabel(sheep);
-            const statusClass = status === 'حامل'
-                ? 'bg-violet-100 text-violet-700'
-                : status === 'قيد المتابعة'
-                    ? 'bg-amber-100 text-amber-700'
-                    : 'bg-stone-100 text-stone-600';
+            const statusBadge = `<span class="text-xs font-medium px-2 py-0.5 rounded-full ${reproStatusClass(status)}">${escapeHtml(status)}</span>`;
 
             let matingsHtml = '';
             if (matings.length === 0) {
@@ -533,7 +552,7 @@
                     <div class="flex justify-between items-center gap-2 mb-3">
                         <div class="text-right flex-1 flex items-center gap-2 flex-wrap justify-start">
                             <div class="text-xs font-bold text-stone-500">التلقيح والحمل</div>
-                            <span class="text-xs font-medium px-2 py-0.5 rounded-full ${statusClass}">${escapeHtml(status)}</span>
+                            ${statusBadge}
                         </div>
                         <button data-action="add-mating" data-tag="${safeTag}" class="text-xs font-semibold px-2.5 py-1 rounded-md bg-lime-600 text-white hover:bg-lime-700 transition shrink-0">+ تلقيح</button>
                     </div>
@@ -696,7 +715,7 @@
             panel.classList.toggle('expanded', filtersExpanded);
             panel.classList.toggle('max-h-0', !filtersExpanded);
             panel.classList.toggle('opacity-0', !filtersExpanded);
-            panel.classList.toggle('max-h-[520px]', filtersExpanded);
+            panel.classList.toggle('max-h-[580px]', filtersExpanded);
             panel.classList.toggle('opacity-100', filtersExpanded);
             chevron.classList.toggle('rotate-180', filtersExpanded);
             toggle.setAttribute('aria-expanded', filtersExpanded ? 'true' : 'false');
@@ -868,6 +887,43 @@
             return !!(s.purchase_date || s.purchase_price || s.purchase_location);
         }
 
+        function sheepOriginLabel(s) {
+            return hasPurchase(s) ? 'مشتري من الخارج' : 'مولود في المزرعة';
+        }
+
+        function getSheepOrigin() {
+            const checked = document.querySelector('input[name="sheep_origin"]:checked');
+            return checked ? checked.value : 'farm';
+        }
+
+        function setSheepOrigin(origin) {
+            document.querySelectorAll('input[name="sheep_origin"]').forEach(radio => {
+                radio.checked = radio.value === origin;
+            });
+            updatePurchaseFieldsVisibility();
+        }
+
+        function updatePurchaseFieldsVisibility() {
+            const isExternal = getSheepOrigin() === 'external';
+            document.getElementById('purchaseFields').classList.toggle('hidden', !isExternal);
+            if (!isExternal) {
+                document.getElementById('purchase_date').value = '';
+                document.getElementById('purchase_price').value = '';
+                document.getElementById('purchase_location').value = '';
+            }
+        }
+
+        function purchasePayloadFields() {
+            if (getSheepOrigin() !== 'external') {
+                return { purchase_date: '', purchase_price: '', purchase_location: '' };
+            }
+            return {
+                purchase_date: document.getElementById('purchase_date').value,
+                purchase_price: document.getElementById('purchase_price').value,
+                purchase_location: document.getElementById('purchase_location').value,
+            };
+        }
+
         function hasNotes(s) {
             return !!(s.notes && s.notes.trim());
         }
@@ -911,7 +967,7 @@
                     ${s.purchase_date ? `<div class="flex justify-between text-sm mb-1"><span class="text-stone-500">التاريخ</span><span>${escapeHtml(s.purchase_date)}</span></div>` : ''}
                     ${s.purchase_price ? `<div class="flex justify-between text-sm mb-1"><span class="text-stone-500">السعر</span><span>${escapeHtml(s.purchase_price)}</span></div>` : ''}
                     ${s.purchase_location ? `<div class="flex justify-between text-sm mb-1"><span class="text-stone-500">المكان</span><span>${escapeHtml(s.purchase_location)}</span></div>` : ''}
-                ` : `<div class="text-sm text-stone-500">لا توجد بيانات شراء</div>`;
+                ` : '';
 
                 const notesPreview = hasNotes(s)
                     ? `<p class="text-sm text-stone-600 line-clamp-2 leading-relaxed mb-2">${escapeHtml(s.notes.slice(0, 120))}${s.notes.length > 120 ? '…' : ''}</p>
@@ -921,6 +977,7 @@
                 const detailsRows = `
                         ${s.name ? `<div class="flex justify-between text-sm"><span class="text-stone-500">اسم الخروف</span><span>${escapeHtml(s.name)}</span></div>` : ''}
                         ${birthRow}
+                        <div class="flex justify-between text-sm"><span class="text-stone-500">مصدر الخروف</span><span>${escapeHtml(sheepOriginLabel(s))}</span></div>
                         ${s.sheep_type ? `<div class="flex justify-between text-sm"><span class="text-stone-500">جنس الخروف</span><span>${escapeHtml(s.sheep_type)}</span></div>` : ''}
                         ${s.life_status ? `<div class="flex justify-between text-sm"><span class="text-stone-500">حالة الحياة</span><span>${escapeHtml(s.life_status)}</span></div>` : ''}
                         ${s.breed !== undefined ? `<div class="flex justify-between text-sm"><span class="text-stone-500">سلالة الخروف</span><span>${escapeHtml(breedLabel(s.breed))}</span></div>` : ''}
@@ -936,7 +993,7 @@
                 const expandedBody = `
                     <div class="space-y-4 min-w-0">
                         ${detailsRows}
-                        <div class="bg-white rounded-lg p-3 border border-stone-200">${purchaseRows}</div>
+                        ${purchaseRows ? `<div class="bg-white rounded-lg p-3 border border-stone-200">${purchaseRows}</div>` : ''}
                         ${reproSection}
                         <div class="bg-white rounded-lg p-3 border border-stone-200">
                             <div class="text-xs font-bold text-stone-500 mb-2">الملاحظات والسجل</div>
@@ -1101,9 +1158,11 @@
             document.getElementById('birth_date').value = sheep.birth_date || todayDateString();
             populateMotherOptions(sheep.tag_id);
             document.getElementById('mother_id').value = sheep.mother_id || '';
+            setSheepOrigin(hasPurchase(sheep) ? 'external' : 'farm');
             document.getElementById('purchase_date').value = sheep.purchase_date || '';
             document.getElementById('purchase_price').value = sheep.purchase_price || '';
             document.getElementById('purchase_location').value = sheep.purchase_location || '';
+            updatePurchaseFieldsVisibility();
             document.getElementById('notes').value = sheep.notes || '';
 
             document.getElementById('formMode').value = 'UPDATE';
@@ -1122,6 +1181,7 @@
             document.getElementById('life_status').value = 'حي';
             document.getElementById('birth_date').value = todayDateString();
             populateMotherOptions();
+            setSheepOrigin('farm');
             document.getElementById('formMode').value = 'CREATE';
             document.getElementById('formTitle').innerText = 'تسجيل رأس جديد';
             document.getElementById('formTitle').className = 'text-lg font-bold text-lime-700';
@@ -1222,9 +1282,7 @@
                 life_status: document.getElementById('life_status').value,
                 birth_date: document.getElementById('birth_date').value || todayDateString(),
                 mother_id: document.getElementById('mother_id').value,
-                purchase_date: document.getElementById('purchase_date').value,
-                purchase_price: document.getElementById('purchase_price').value,
-                purchase_location: document.getElementById('purchase_location').value,
+                ...purchasePayloadFields(),
                 notes: document.getElementById('notes').value
             };
 

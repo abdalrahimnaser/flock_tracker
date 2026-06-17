@@ -163,34 +163,35 @@ def compute_pregnancy_status(cursor, tag_id):
         return 'غير حامل'
 
     cursor.execute('''
-        SELECT 1 FROM matings m
-        WHERE m.sheep_tag_id = ? AND m.result = 'pass' AND m.completed_at IS NULL
-          AND EXISTS (
-              SELECT 1 FROM ultrasounds u
-              WHERE u.mating_id = m.id AND u.result = 'pass'
-          )
+        SELECT m.id, m.result
+        FROM matings m
+        WHERE m.sheep_tag_id = ? AND m.completed_at IS NULL
+        ORDER BY m.mated_date DESC, m.id DESC
         LIMIT 1
     ''', (tag_id,))
-    if cursor.fetchone():
-        return 'حامل'
+    mating = cursor.fetchone()
+    if not mating:
+        return 'غير حامل'
+
+    mating_id, mating_result = mating
+    if mating_result == 'fail':
+        return 'غير حامل'
+
+    if mating_result != 'pass':
+        return 'انتظار السونار'
 
     cursor.execute('''
-        SELECT 1 FROM matings m
-        WHERE m.sheep_tag_id = ? AND m.completed_at IS NULL
-          AND (
-              m.result IS NULL
-              OR (
-                  m.result = 'pass'
-                  AND NOT EXISTS (
-                      SELECT 1 FROM ultrasounds u
-                      WHERE u.mating_id = m.id AND u.result = 'pass'
-                  )
-              )
-          )
+        SELECT result FROM ultrasounds
+        WHERE mating_id = ?
+        ORDER BY scan_date DESC, id DESC
         LIMIT 1
-    ''', (tag_id,))
-    if cursor.fetchone():
-        return 'قيد المتابعة'
+    ''', (mating_id,))
+    latest_ultrasound = cursor.fetchone()
+    if not latest_ultrasound:
+        return 'انتظار السونار'
+
+    if latest_ultrasound[0] == 'pass':
+        return 'حامل'
 
     return 'غير حامل'
 
