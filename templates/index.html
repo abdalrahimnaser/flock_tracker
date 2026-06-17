@@ -10,6 +10,8 @@
         #formPanel { transition: transform 0.3s ease; }
         #formBackdrop { transition: opacity 0.3s ease; }
         .card-details { transition: max-height 0.25s ease, opacity 0.2s ease; }
+        .filter-panel { transition: max-height 0.25s ease, opacity 0.2s ease, padding 0.25s ease; }
+        .filter-panel:not(.expanded) { padding-top: 0; padding-bottom: 0; border-width: 0; }
         .toast-enter { animation: toastIn 0.3s ease forwards; }
         .toast-exit { animation: toastOut 0.3s ease forwards; }
         @keyframes toastIn {
@@ -36,8 +38,8 @@
                     <div class="text-xs text-stone-500 mt-0.5">إجمالي القطيع</div>
                 </div>
                 <div class="bg-white border border-stone-200 rounded-xl p-3 shadow-sm">
-                    <div id="statBreeds" class="text-2xl font-bold text-amber-600">0</div>
-                    <div class="text-xs text-stone-500 mt-0.5">سلالات</div>
+                    <div id="statDead" class="text-2xl font-bold text-red-600">0</div>
+                    <div class="text-xs text-stone-500 mt-0.5">ميت</div>
                 </div>
                 <div class="bg-white border border-stone-200 rounded-xl p-3 shadow-sm">
                     <div id="statMothers" class="text-2xl font-bold text-rose-600">0</div>
@@ -52,12 +54,67 @@
                 <p id="resultsCount" class="text-xs text-stone-500 text-right"></p>
             </div>
 
-            <div class="mb-3">
-                <input type="text" id="searchBar" placeholder="ابحث برقم الخروف، الاسم، السلالة، أو الملاحظات..."
-                    class="w-full bg-stone-50 border border-stone-300 rounded-lg p-3 text-stone-900 focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500 outline-none text-sm">
-            </div>
+            <div class="mb-4 space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                    <button type="button" id="filterToggle" aria-expanded="false"
+                        class="inline-flex items-center gap-2 px-3.5 py-2 rounded-full border border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50 transition text-sm font-medium text-stone-700 shadow-sm">
+                        <svg class="w-4 h-4 text-stone-500" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M7 12h10M10 18h4"/>
+                        </svg>
+                        <span>فلاتر</span>
+                        <span id="filterBadge" class="hidden min-w-[1.25rem] h-5 px-1.5 rounded-full bg-lime-600 text-white text-[11px] font-bold leading-none inline-flex items-center justify-center">0</span>
+                        <span id="filterChevron" class="text-stone-400 text-[10px] transition-transform duration-200 mr-0.5">▼</span>
+                    </button>
+                    <button type="button" id="clearFilters" class="hidden text-xs font-medium text-stone-500 hover:text-red-600 transition px-2 py-1 rounded-md hover:bg-red-50">
+                        مسح الفلاتر
+                    </button>
+                </div>
 
-            <div id="breedFilters" class="flex flex-wrap gap-2 mb-5"></div>
+                <div id="filterPanel" class="filter-panel rounded-2xl bg-stone-50 border border-stone-200/80 px-4 py-0 space-y-4 max-h-0 opacity-0 overflow-hidden">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+                        <div>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">حالة الحياة</span>
+                            <div id="lifeFilters" class="flex flex-wrap gap-1.5"></div>
+                        </div>
+                        <div>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">حالة الأم</span>
+                            <div id="motherFilters" class="flex flex-wrap gap-1.5"></div>
+                        </div>
+                        <div>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">جنس الخروف</span>
+                            <div id="genderFilters" class="flex flex-wrap gap-1.5"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="text-xs font-medium text-stone-500 mb-2 block">العمر</span>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <input type="number" id="ageFilterMin" min="0" step="1" placeholder="من"
+                                class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
+                            <span class="text-stone-400 text-xs">—</span>
+                            <input type="number" id="ageFilterMax" min="0" step="1" placeholder="إلى"
+                                class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
+                            <select id="ageFilterUnit"
+                                class="bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
+                                <option value="days">يوم</option>
+                                <option value="months">شهر</option>
+                                <option value="years">سنة</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="pb-4">
+                        <span class="text-xs font-medium text-stone-500 mb-2 block">السلالة</span>
+                        <div id="breedFilters" class="flex flex-wrap gap-1.5"></div>
+                    </div>
+                </div>
+
+                <div class="relative">
+                    <input type="text" id="searchBar" placeholder="ابحث برقم الخروف..."
+                        class="w-full bg-white border border-stone-200 rounded-xl py-2.5 pr-10 pl-4 text-stone-900 placeholder:text-stone-400 focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500 outline-none text-sm shadow-sm">
+                    <svg class="w-4 h-4 text-stone-400 absolute top-1/2 -translate-y-1/2 right-3 pointer-events-none" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M20 20l-3-3"/>
+                    </svg>
+                </div>
+            </div>
 
             <div id="sheepList" class="space-y-3"></div>
 
@@ -187,9 +244,34 @@
     <script>
         let allSheep = [];
         let activeBreedFilter = '';
+        let activeLifeFilter = '';
+        let activeMotherFilter = '';
+        let activeGenderFilter = '';
+        let filtersExpanded = false;
         let expandedCards = new Set();
 
+        const LIFE_FILTER_OPTIONS = [
+            { value: '', label: 'الكل' },
+            { value: 'حي', label: 'حي' },
+            { value: 'ميت', label: 'ميت' },
+        ];
+
+        const MOTHER_FILTER_OPTIONS = [
+            { value: '', label: 'الكل' },
+            { value: 'أم', label: 'أم' },
+            { value: 'ليس أم بعد', label: 'ليس أم بعد' },
+        ];
+
+        const GENDER_FILTER_OPTIONS = [
+            { value: '', label: 'الكل' },
+            { value: 'حملة', label: 'حملة' },
+            { value: 'خروف', label: 'خروف' },
+        ];
+
         document.addEventListener('DOMContentLoaded', () => {
+            renderLifeFilters();
+            renderMotherFilters();
+            renderGenderFilters();
             fetchSheep();
             fetchBreeds();
         });
@@ -284,6 +366,181 @@
             return sheep.mother_status === 'أم' ? 'أم' : 'ليس أم بعد';
         }
 
+        function filterChipClass(active) {
+            return active
+                ? 'bg-lime-600 border-lime-600 text-white shadow-sm'
+                : 'bg-white border-stone-200 text-stone-600 hover:border-stone-300 hover:bg-stone-50';
+        }
+
+        function renderFilterGroup(containerId, options, activeValue, dataAttr) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = options.map(opt => `
+                <button ${dataAttr}="${escapeHtml(opt.value)}" class="filter-chip px-2.5 py-1 rounded-lg text-xs font-medium border transition ${filterChipClass(activeValue === opt.value)}">${escapeHtml(opt.label)}</button>
+            `).join('');
+        }
+
+        function renderLifeFilters() {
+            renderFilterGroup('lifeFilters', LIFE_FILTER_OPTIONS, activeLifeFilter, 'data-life');
+        }
+
+        function renderMotherFilters() {
+            renderFilterGroup('motherFilters', MOTHER_FILTER_OPTIONS, activeMotherFilter, 'data-mother');
+        }
+
+        function renderGenderFilters() {
+            renderFilterGroup('genderFilters', GENDER_FILTER_OPTIONS, activeGenderFilter, 'data-gender');
+        }
+
+        function getAgeFilterValues() {
+            return {
+                minRaw: document.getElementById('ageFilterMin').value.trim(),
+                maxRaw: document.getElementById('ageFilterMax').value.trim(),
+                unit: document.getElementById('ageFilterUnit').value,
+            };
+        }
+
+        function hasAgeFilter() {
+            const { minRaw, maxRaw } = getAgeFilterValues();
+            return minRaw !== '' || maxRaw !== '';
+        }
+
+        function getAgeFilterNormalizedBounds() {
+            const { minRaw, maxRaw, unit } = getAgeFilterValues();
+            let min = minRaw !== '' ? Number(minRaw) : null;
+            let max = maxRaw !== '' ? Number(maxRaw) : null;
+            if (min !== null && max !== null && min > max) [min, max] = [max, min];
+            return { min, max, unit };
+        }
+
+        function getAgeFilterSummaryLabel() {
+            const { minRaw, maxRaw, unit } = getAgeFilterValues();
+            if (!minRaw && !maxRaw) return null;
+            const unitFor = (n) => {
+                const num = Number(n);
+                if (unit === 'years') return num === 1 ? 'سنة' : 'سنوات';
+                if (unit === 'months') return num === 1 ? 'شهر' : 'أشهر';
+                if (num === 0) return 'اليوم';
+                if (num === 1) return 'يوم';
+                if (num === 2) return 'يومان';
+                if (num <= 10) return 'أيام';
+                return 'يوماً';
+            };
+            if (minRaw && maxRaw) return `${minRaw}–${maxRaw} ${unitFor(maxRaw)}`;
+            if (minRaw) return `من ${minRaw} ${unitFor(minRaw)}`;
+            return `حتى ${maxRaw} ${unitFor(maxRaw)}`;
+        }
+
+        function getAgeDays(birthDate) {
+            if (!birthDate) return null;
+            const birth = new Date(`${birthDate}T00:00:00`);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (Number.isNaN(birth.getTime()) || birth > today) return null;
+            return Math.floor((today - birth) / (1000 * 60 * 60 * 24));
+        }
+
+        function getAgeMonths(birthDate) {
+            if (!birthDate) return null;
+            const birth = new Date(`${birthDate}T00:00:00`);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (Number.isNaN(birth.getTime()) || birth > today) return null;
+
+            let years = today.getFullYear() - birth.getFullYear();
+            let months = today.getMonth() - birth.getMonth();
+            const days = today.getDate() - birth.getDate();
+            if (days < 0) months -= 1;
+            if (months < 0) {
+                years -= 1;
+                months += 12;
+            }
+            return years * 12 + months;
+        }
+
+        function matchesAgeFilter(sheep) {
+            if (!hasAgeFilter()) return true;
+            const { min, max, unit } = getAgeFilterNormalizedBounds();
+
+            if (unit === 'days') {
+                const days = getAgeDays(sheep.birth_date);
+                if (days === null) return false;
+                if (min !== null && days < min) return false;
+                if (max !== null && days > max) return false;
+                return true;
+            }
+
+            const months = getAgeMonths(sheep.birth_date);
+            if (months === null) return false;
+            const multiplier = unit === 'years' ? 12 : 1;
+            const minBound = min !== null ? min * multiplier : null;
+            const maxBound = max !== null ? max * multiplier : null;
+            if (minBound !== null && months < minBound) return false;
+            if (maxBound !== null && months > maxBound) return false;
+            return true;
+        }
+
+        function hasActiveFilters() {
+            return !!(activeBreedFilter || activeLifeFilter || activeMotherFilter || activeGenderFilter || hasAgeFilter() || document.getElementById('searchBar').value.trim());
+        }
+
+        function getActiveFilterSummary() {
+            const parts = [];
+            if (activeLifeFilter) parts.push(activeLifeFilter);
+            if (activeMotherFilter) parts.push(activeMotherFilter);
+            if (activeGenderFilter) parts.push(activeGenderFilter);
+            const ageLabel = getAgeFilterSummaryLabel();
+            if (ageLabel) parts.push(ageLabel);
+            if (activeBreedFilter) parts.push(activeBreedFilter);
+            return parts;
+        }
+
+        function updateFilterSummary() {
+            const parts = getActiveFilterSummary();
+            const badge = document.getElementById('filterBadge');
+            const clearBtn = document.getElementById('clearFilters');
+            const toggle = document.getElementById('filterToggle');
+
+            if (parts.length) {
+                badge.textContent = parts.length;
+                badge.classList.remove('hidden');
+                clearBtn.classList.remove('hidden');
+                toggle.classList.add('border-lime-300', 'bg-lime-50', 'text-lime-800');
+            } else {
+                badge.classList.add('hidden');
+                clearBtn.classList.add('hidden');
+                toggle.classList.remove('border-lime-300', 'bg-lime-50', 'text-lime-800');
+            }
+        }
+
+        function clearAllFilters() {
+            activeBreedFilter = '';
+            activeLifeFilter = '';
+            activeMotherFilter = '';
+            activeGenderFilter = '';
+            document.getElementById('ageFilterMin').value = '';
+            document.getElementById('ageFilterMax').value = '';
+            document.getElementById('ageFilterUnit').value = 'months';
+            renderLifeFilters();
+            renderMotherFilters();
+            renderGenderFilters();
+            renderBreedFilters();
+            applyFilters();
+        }
+
+        function toggleFilterPanel(force) {
+            filtersExpanded = typeof force === 'boolean' ? force : !filtersExpanded;
+            const panel = document.getElementById('filterPanel');
+            const chevron = document.getElementById('filterChevron');
+            const toggle = document.getElementById('filterToggle');
+            panel.classList.toggle('expanded', filtersExpanded);
+            panel.classList.toggle('max-h-0', !filtersExpanded);
+            panel.classList.toggle('opacity-0', !filtersExpanded);
+            panel.classList.toggle('max-h-[520px]', filtersExpanded);
+            panel.classList.toggle('opacity-100', filtersExpanded);
+            chevron.classList.toggle('rotate-180', filtersExpanded);
+            toggle.setAttribute('aria-expanded', filtersExpanded ? 'true' : 'false');
+        }
+
         function todayDateString() {
             const d = new Date();
             const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -366,23 +623,20 @@
         }
 
         function updateStats() {
-            const breeds = new Set(allSheep.map(s => s.breed).filter(Boolean));
             const mothers = allSheep.filter(s => s.mother_status === 'أم').length;
+            const dead = allSheep.filter(s => s.life_status === 'ميت').length;
             document.getElementById('statTotal').textContent = allSheep.length;
-            document.getElementById('statBreeds').textContent = breeds.size;
+            document.getElementById('statDead').textContent = dead;
             document.getElementById('statMothers').textContent = mothers;
         }
 
         function renderBreedFilters() {
             const container = document.getElementById('breedFilters');
             const breeds = [...new Set(allSheep.map(s => s.breed).filter(Boolean))].sort();
-            const chipClass = (active) => active
-                ? 'bg-lime-600 border-lime-600 text-white'
-                : 'bg-white border-stone-300 text-stone-600 hover:bg-stone-50';
 
-            let html = `<button data-breed="" class="breed-chip px-3 py-1 rounded-full text-xs font-medium border transition ${chipClass(!activeBreedFilter)}">الكل</button>`;
+            let html = `<button data-breed="" class="breed-chip px-2.5 py-1 rounded-lg text-xs font-medium border transition ${filterChipClass(!activeBreedFilter)}">الكل</button>`;
             breeds.forEach(b => {
-                html += `<button data-breed="${escapeHtml(b)}" class="breed-chip px-3 py-1 rounded-full text-xs font-medium border transition ${chipClass(activeBreedFilter === b)}">${escapeHtml(b)}</button>`;
+                html += `<button data-breed="${escapeHtml(b)}" class="breed-chip px-2.5 py-1 rounded-lg text-xs font-medium border transition ${filterChipClass(activeBreedFilter === b)}">${escapeHtml(b)}</button>`;
             });
             container.innerHTML = html;
         }
@@ -393,6 +647,24 @@
             applyFilters();
         }
 
+        function setLifeFilter(value) {
+            activeLifeFilter = value;
+            renderLifeFilters();
+            applyFilters();
+        }
+
+        function setMotherFilter(value) {
+            activeMotherFilter = value;
+            renderMotherFilters();
+            applyFilters();
+        }
+
+        function setGenderFilter(value) {
+            activeGenderFilter = value;
+            renderGenderFilters();
+            applyFilters();
+        }
+
         function applyFilters() {
             const query = document.getElementById('searchBar').value.trim().toLowerCase();
             let filtered = allSheep;
@@ -400,14 +672,24 @@
             if (activeBreedFilter) {
                 filtered = filtered.filter(s => s.breed === activeBreedFilter);
             }
+            if (activeLifeFilter) {
+                filtered = filtered.filter(s => activeLifeFilter === 'حي' ? s.life_status !== 'ميت' : s.life_status === 'ميت');
+            }
+            if (activeMotherFilter) {
+                filtered = filtered.filter(s => motherStatusLabel(s) === activeMotherFilter);
+            }
+            if (activeGenderFilter) {
+                filtered = filtered.filter(s => s.sheep_type === activeGenderFilter);
+            }
+            if (hasAgeFilter()) {
+                filtered = filtered.filter(s => matchesAgeFilter(s));
+            }
             if (query) {
-                filtered = filtered.filter(s => {
-                    const combined = `${s.tag_id} ${s.name} ${breedLabel(s.breed)} ${s.sheep_type} ${s.life_status} ${s.mother_status} ${s.mother_id} ${s.child_count} ${s.birth_date} ${s.purchase_date} ${s.purchase_price} ${s.purchase_location} ${s.notes}`.toLowerCase();
-                    return combined.includes(query);
-                });
+                filtered = filtered.filter(s => s.tag_id.toLowerCase().includes(query));
             }
 
             renderCards(filtered);
+            updateFilterSummary();
         }
 
         function hasPurchase(s) {
@@ -432,7 +714,7 @@
 
             empty.classList.add('hidden');
 
-            const isFiltered = data.length !== allSheep.length || activeBreedFilter || document.getElementById('searchBar').value.trim();
+            const isFiltered = hasActiveFilters();
             resultsCount.textContent = isFiltered ? `عرض ${data.length} من ${allSheep.length}` : `${allSheep.length} رأس`;
 
             if (data.length === 0) {
@@ -605,9 +887,32 @@
             }
         }
 
+        document.getElementById('filterToggle').addEventListener('click', () => toggleFilterPanel());
+        document.getElementById('clearFilters').addEventListener('click', clearAllFilters);
+
         document.getElementById('breedFilters').addEventListener('click', (e) => {
             const chip = e.target.closest('[data-breed]');
-            if (chip) setBreedFilter(chip.dataset.breed);
+            if (chip) setBreedFilter(chip.getAttribute('data-breed') || '');
+        });
+
+        document.getElementById('lifeFilters').addEventListener('click', (e) => {
+            const chip = e.target.closest('[data-life]');
+            if (chip) setLifeFilter(chip.getAttribute('data-life') || '');
+        });
+
+        document.getElementById('motherFilters').addEventListener('click', (e) => {
+            const chip = e.target.closest('[data-mother]');
+            if (chip) setMotherFilter(chip.getAttribute('data-mother') || '');
+        });
+
+        document.getElementById('genderFilters').addEventListener('click', (e) => {
+            const chip = e.target.closest('[data-gender]');
+            if (chip) setGenderFilter(chip.getAttribute('data-gender') || '');
+        });
+
+        ['ageFilterMin', 'ageFilterMax', 'ageFilterUnit'].forEach(id => {
+            document.getElementById(id).addEventListener('input', applyFilters);
+            document.getElementById(id).addEventListener('change', applyFilters);
         });
 
         document.getElementById('sheepList').addEventListener('click', (e) => {
