@@ -497,11 +497,11 @@ def add_mating(tag_id):
 @app.route('/api/matings/<int:mating_id>', methods=['PATCH'])
 def update_mating(mating_id):
     data = request.json or {}
-    result = (data.get('result') or '').strip()
+    result = data.get('result')
     notes = data.get('notes')
 
-    if result not in ('pass', 'fail'):
-        return jsonify({"success": False, "message": "النتيجة يجب أن تكون pass أو fail."}), 400
+    if result is None and notes is None:
+        return jsonify({"success": False, "message": "لا توجد بيانات للتحديث."}), 400
 
     try:
         conn = get_connection()
@@ -510,6 +510,19 @@ def update_mating(mating_id):
         if not row:
             conn.close()
             return jsonify({"success": False, "message": "سجل التلقيح غير موجود."}), 404
+
+        if notes is not None and result is None:
+            cursor.execute(
+                "UPDATE matings SET notes = ? WHERE id = ?",
+                ((notes or '').strip(), mating_id),
+            )
+            conn.commit()
+            conn.close()
+            return jsonify({"success": True, "message": "تم حفظ الملاحظة."})
+
+        result = (result or '').strip()
+        if result not in ('pass', 'fail'):
+            return jsonify({"success": False, "message": "النتيجة يجب أن تكون pass أو fail."}), 400
         if row[4] is not None:
             conn.close()
             return jsonify({"success": False, "message": "تم تحديد نتيجة هذا التلقيح مسبقاً."}), 400

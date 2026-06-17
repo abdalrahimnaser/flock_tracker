@@ -32,7 +32,7 @@
                 <h1 class="text-3xl font-bold text-lime-700">مُتابع القطيع</h1>
                 <p class="text-stone-500 text-sm mt-1">إدارة القطيع — عرض بطاقات وتفاصيل موسّعة</p>
             </div>
-            <div id="statsBar" class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+            <div id="statsBar" class="grid grid-cols-3 gap-3 text-center">
                 <div class="bg-white border border-stone-200 rounded-xl p-3 shadow-sm">
                     <div id="statTotal" class="text-2xl font-bold text-lime-700">0</div>
                     <div class="text-xs text-stone-500 mt-0.5">إجمالي القطيع</div>
@@ -42,12 +42,8 @@
                     <div class="text-xs text-stone-500 mt-0.5">حامل</div>
                 </div>
                 <div class="bg-white border border-stone-200 rounded-xl p-3 shadow-sm">
-                    <div id="statDead" class="text-2xl font-bold text-red-600">0</div>
-                    <div class="text-xs text-stone-500 mt-0.5">ميت</div>
-                </div>
-                <div class="bg-white border border-stone-200 rounded-xl p-3 shadow-sm">
-                    <div id="statMothers" class="text-2xl font-bold text-rose-600">0</div>
-                    <div class="text-xs text-stone-500 mt-0.5">أمهات</div>
+                    <div id="statAwaitingSonar" class="text-2xl font-bold text-amber-600">0</div>
+                    <div class="text-xs text-stone-500 mt-0.5">انتظار السونار</div>
                 </div>
             </div>
         </header>
@@ -230,7 +226,7 @@
                     <input type="text" id="name" class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-1 text-stone-700">ملاحظات</label>
+                    <label class="block text-sm font-medium mb-1 text-stone-700">ملاحظات اضافية</label>
                     <textarea id="notes" rows="4" placeholder="أدخل الملاحظات هنا..." class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500 text-sm resize-none"></textarea>
                 </div>
             </form>
@@ -479,6 +475,20 @@
             return result === 'pass' ? 'text-emerald-700' : 'text-red-600';
         }
 
+        function renderReproNoteInput(type, id, notes) {
+            const safeNotes = escapeHtml(notes || '');
+            return `
+                <input type="text"
+                    data-repro-note="${type}"
+                    data-id="${id}"
+                    data-original="${safeNotes}"
+                    value="${safeNotes}"
+                    placeholder="ملاحظة..."
+                    onclick="event.stopPropagation()"
+                    class="w-full text-xs bg-white/80 border border-stone-200 rounded-md px-2.5 py-1.5 text-stone-700 placeholder:text-stone-400 outline-none focus:ring-1 focus:ring-lime-500/40 focus:border-lime-400">
+            `;
+        }
+
         function renderReproductionSection(sheep) {
             if (sheep.sheep_type !== 'حملة') return '';
 
@@ -493,8 +503,7 @@
             } else {
                 matingsHtml = matings.map(m => {
                     const resultBadge = `<span class="text-xs font-medium px-2 py-0.5 rounded-full ${matingResultClass(m.result, m.needs_review)}">${escapeHtml(matingResultLabel(m.result))}${m.needs_review ? ' (20+ يوم)' : ''}</span>`;
-                    const notesLine = m.notes ? `<p class="text-xs text-stone-500 mt-1">${escapeHtml(m.notes)}</p>` : '';
-                    const completedLine = m.completed_at ? `<p class="text-xs text-stone-400 mt-1">دورة مغلقة</p>` : '';
+                    const completedLine = m.completed_at ? `<p class="text-xs text-stone-400 mt-1.5">دورة مغلقة</p>` : '';
 
                     let actionsHtml = '';
                     if (!m.result) {
@@ -519,13 +528,15 @@
                             <div class="mt-2 mr-2 pr-3 border-r-2 border-violet-200 space-y-2">
                                 <div class="text-xs font-bold text-stone-500">سونار</div>
                                 ${m.ultrasounds.map(u => `
-                                    <div class="text-sm flex justify-between gap-2 items-start">
-                                        <button data-action="delete-ultrasound" data-id="${u.id}" class="text-stone-400 hover:text-red-600 text-xs shrink-0" title="حذف">×</button>
-                                        <div class="flex-1 text-right">
-                                            <span class="font-medium">${escapeHtml(u.scan_date)}</span>
-                                            <span class="text-xs font-semibold mr-2 ${ultrasoundResultClass(u.result)}">${u.result === 'pass' ? 'ناجح' : 'فاشل'}</span>
-                                            ${u.notes ? `<p class="text-xs text-stone-500 mt-0.5">${escapeHtml(u.notes)}</p>` : ''}
+                                    <div class="space-y-1.5">
+                                        <div class="text-sm flex justify-between gap-2 items-start">
+                                            <button data-action="delete-ultrasound" data-id="${u.id}" class="text-stone-400 hover:text-red-600 text-xs shrink-0" title="حذف">×</button>
+                                            <div class="flex-1 text-right">
+                                                <span class="font-medium">${escapeHtml(u.scan_date)}</span>
+                                                <span class="text-xs font-semibold mr-2 ${ultrasoundResultClass(u.result)}">${u.result === 'pass' ? 'ناجح' : 'فاشل'}</span>
+                                            </div>
                                         </div>
+                                        ${renderReproNoteInput('ultrasound', u.id, u.notes)}
                                     </div>
                                 `).join('')}
                             </div>`;
@@ -540,7 +551,8 @@
                                 </div>
                                 ${deleteBtn}
                             </div>
-                            ${notesLine || completedLine ? `<div class="mt-1 text-right">${notesLine}${completedLine}</div>` : ''}
+                            <div class="mt-2">${renderReproNoteInput('mating', m.id, m.notes)}</div>
+                            ${completedLine}
                             ${ultrasoundsHtml}
                             ${actionsHtml}
                         </div>`;
@@ -803,13 +815,11 @@
         }
 
         function updateStats() {
-            const mothers = allSheep.filter(s => s.mother_status === 'أم').length;
-            const dead = allSheep.filter(s => s.life_status === 'ميت').length;
             const pregnant = allSheep.filter(s => pregnancyStatusLabel(s) === 'حامل').length;
+            const awaitingSonar = allSheep.filter(s => pregnancyStatusLabel(s) === 'انتظار السونار').length;
             document.getElementById('statTotal').textContent = allSheep.length;
             document.getElementById('statPregnant').textContent = pregnant;
-            document.getElementById('statDead').textContent = dead;
-            document.getElementById('statMothers').textContent = mothers;
+            document.getElementById('statAwaitingSonar').textContent = awaitingSonar;
         }
 
         function renderBreedFilters() {
@@ -996,7 +1006,7 @@
                         ${purchaseRows ? `<div class="bg-white rounded-lg p-3 border border-stone-200">${purchaseRows}</div>` : ''}
                         ${reproSection}
                         <div class="bg-white rounded-lg p-3 border border-stone-200">
-                            <div class="text-xs font-bold text-stone-500 mb-2">الملاحظات والسجل</div>
+                            <div class="text-xs font-bold text-stone-500 mb-2">ملاحظات اضافية</div>
                             ${notesPreview}
                         </div>
                     </div>`;
@@ -1092,6 +1102,32 @@
             const modal = document.getElementById('reproModal');
             modal.classList.add('opacity-0');
             setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        async function saveReproNote(input) {
+            const type = input.dataset.reproNote;
+            const id = input.dataset.id;
+            const notes = input.value.trim();
+            const original = input.dataset.original || '';
+            if (notes === original) return;
+
+            const url = type === 'mating' ? `/api/matings/${id}` : `/api/ultrasounds/${id}`;
+            try {
+                const response = await fetch(url, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notes }),
+                });
+                const data = await response.json();
+                if (data.success !== false) {
+                    input.dataset.original = notes;
+                    showToast('تم حفظ الملاحظة', 'success');
+                } else {
+                    showToast(data.message, 'error');
+                }
+            } catch (err) {
+                showToast('تعذر حفظ الملاحظة', 'error');
+            }
         }
 
         async function setMatingResult(matingId, result) {
@@ -1240,6 +1276,19 @@
         ['ageFilterMin', 'ageFilterMax', 'ageFilterUnit'].forEach(id => {
             document.getElementById(id).addEventListener('input', applyFilters);
             document.getElementById(id).addEventListener('change', applyFilters);
+        });
+
+        document.getElementById('sheepList').addEventListener('keydown', (e) => {
+            if (e.target.matches('[data-repro-note]') && e.key === 'Enter') {
+                e.preventDefault();
+                e.target.blur();
+            }
+        });
+
+        document.getElementById('sheepList').addEventListener('focusout', (e) => {
+            if (e.target.matches('[data-repro-note]')) {
+                saveReproNote(e.target);
+            }
         });
 
         document.getElementById('sheepList').addEventListener('click', (e) => {
