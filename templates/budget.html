@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ميزانية المزرعة</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: linear-gradient(165deg, #fafaf9 0%, #f5f5f4 50%, #fff7ed 100%); }
+        .toast-enter { animation: toastIn 0.3s ease forwards; }
+        .toast-exit { animation: toastOut 0.3s ease forwards; }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(1rem); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateY(0); }
+            to   { opacity: 0; transform: translateY(1rem); }
+        }
+        .type-btn.selected-in { background: #059669; color: white; border-color: #059669; }
+        .type-btn.selected-out { background: #dc2626; color: white; border-color: #dc2626; }
+        .num { font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
+    </style>
+</head>
+<body class="text-stone-800 min-h-screen font-sans relative pb-24">
+
+    <nav class="bg-white border-b border-stone-200 sticky top-0 z-40">
+        <div class="container mx-auto max-w-3xl px-4 py-3 flex items-center justify-center gap-2">
+            <a href="/" class="px-4 py-2 rounded-lg text-sm font-medium text-stone-600 hover:bg-stone-100 transition">
+                مُتابع القطيع
+            </a>
+            <a href="/budget" class="px-4 py-2 rounded-lg text-sm font-medium bg-amber-600 text-white shadow-sm">
+                ميزانية المزرعة
+            </a>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-4 max-w-3xl">
+        <header class="my-6 text-center">
+            <h1 class="text-3xl font-bold text-amber-700">ميزانية المزرعة</h1>
+            <p class="text-stone-500 text-sm mt-1">تتبع النقدية — إيرادات ومصروفات</p>
+        </header>
+
+        <div id="statsBar" class="grid grid-cols-3 gap-3 text-center mb-6">
+            <div class="bg-white border border-stone-200 rounded-xl p-4 shadow-sm">
+                <div id="statBalance" class="text-2xl font-bold text-amber-700 num">—</div>
+                <div class="text-xs text-stone-500 mt-0.5">الرصيد الحالي</div>
+            </div>
+            <div class="bg-white border border-stone-200 rounded-xl p-4 shadow-sm">
+                <div id="statIncome" class="text-2xl font-bold text-emerald-600 num">—</div>
+                <div class="text-xs text-stone-500 mt-0.5">إيرادات الشهر</div>
+            </div>
+            <div class="bg-white border border-stone-200 rounded-xl p-4 shadow-sm">
+                <div id="statExpenses" class="text-2xl font-bold text-red-600 num">—</div>
+                <div class="text-xs text-stone-500 mt-0.5">مصروفات الشهر</div>
+            </div>
+        </div>
+
+        <section class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-stone-200 mb-6">
+            <h2 class="text-lg font-bold mb-4">تسجيل حركة جديدة</h2>
+            <form id="addForm" class="space-y-4">
+                <div class="flex gap-2">
+                    <button type="button" id="btnIncome" data-type="in"
+                        class="type-btn flex-1 py-2.5 rounded-lg border border-stone-200 text-sm font-medium transition hover:border-emerald-400">
+                        + إيراد
+                    </button>
+                    <button type="button" id="btnExpense" data-type="out"
+                        class="type-btn flex-1 py-2.5 rounded-lg border border-stone-200 text-sm font-medium transition hover:border-red-400 selected-out">
+                        − مصروف
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-medium text-stone-500 block mb-1">المبلغ</label>
+                        <input type="number" id="amount" min="0" step="0.01" required placeholder="0.00" lang="en"
+                            class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 num">
+                    </div>
+                    <div>
+                        <label class="text-xs font-medium text-stone-500 block mb-1">التاريخ</label>
+                        <input type="date" id="transactionDate" required
+                            class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-stone-500 block mb-1">الوصف</label>
+                    <input type="text" id="description" required placeholder="مثال: علف، بيع خروف، إصلاح سياج..."
+                        class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
+                </div>
+                <button type="submit"
+                    class="w-full py-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium transition shadow-sm">
+                    حفظ
+                </button>
+            </form>
+        </section>
+
+        <section class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-stone-200">
+            <h2 class="text-lg font-bold mb-4">سجل الحركات</h2>
+            <div id="emptyState" class="hidden text-center py-12 text-stone-400">
+                <p class="text-sm">لا توجد حركات بعد</p>
+                <p class="text-xs mt-1">ابدأ بتسجيل رصيدك الافتتاحي أو أول مصروف</p>
+            </div>
+            <div id="txList" class="text-sm"></div>
+        </section>
+    </div>
+
+    <div id="editModal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/40" id="editBackdrop"></div>
+        <div class="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto bg-white rounded-2xl shadow-xl p-6">
+            <h3 class="text-lg font-bold mb-4">تعديل الحركة</h3>
+            <form id="editForm" class="space-y-4">
+                <input type="hidden" id="editId">
+                <div class="flex gap-2">
+                    <button type="button" id="editBtnIncome" data-type="in"
+                        class="type-btn flex-1 py-2 rounded-lg border border-stone-200 text-sm font-medium transition">
+                        + إيراد
+                    </button>
+                    <button type="button" id="editBtnExpense" data-type="out"
+                        class="type-btn flex-1 py-2 rounded-lg border border-stone-200 text-sm font-medium transition">
+                        − مصروف
+                    </button>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-stone-500 block mb-1">المبلغ</label>
+                    <input type="number" id="editAmount" min="0" step="0.01" required lang="en"
+                        class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 num">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-stone-500 block mb-1">التاريخ</label>
+                    <input type="date" id="editDate" required
+                        class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-stone-500 block mb-1">الوصف</label>
+                    <input type="text" id="editDescription" required
+                        class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="button" id="editCancel"
+                        class="flex-1 py-2.5 rounded-lg border border-stone-200 text-stone-600 font-medium hover:bg-stone-50 transition">
+                        إلغاء
+                    </button>
+                    <button type="submit"
+                        class="flex-1 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium transition">
+                        حفظ
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <script>
+        let entryType = 'out';
+        let editType = 'out';
+        let transactionsCache = [];
+
+        const numFmt = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+        const fmt = (n) => {
+            const abs = Math.abs(n).toLocaleString('en-US', numFmt);
+            return n < 0 ? `-${abs}` : `+${abs}`;
+        };
+        const fmtBalance = (n) => n.toLocaleString('en-US', numFmt);
+        const fmtDate = (iso) => {
+            const [y, m, d] = iso.split('-');
+            return `${d}/${m}/${y}`;
+        };
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const el = document.createElement('div');
+            const colors = type === 'error'
+                ? 'bg-red-600 text-white'
+                : 'bg-stone-800 text-white';
+            el.className = `toast-enter px-5 py-3 rounded-xl shadow-lg text-sm font-medium ${colors}`;
+            el.textContent = message;
+            container.appendChild(el);
+            setTimeout(() => {
+                el.classList.replace('toast-enter', 'toast-exit');
+                setTimeout(() => el.remove(), 300);
+            }, 3000);
+        }
+
+        function setType(type, isEdit = false) {
+            if (isEdit) {
+                editType = type;
+                document.getElementById('editBtnIncome').classList.toggle('selected-in', type === 'in');
+                document.getElementById('editBtnExpense').classList.toggle('selected-out', type === 'out');
+            } else {
+                entryType = type;
+                document.getElementById('btnIncome').classList.toggle('selected-in', type === 'in');
+                document.getElementById('btnExpense').classList.toggle('selected-out', type === 'out');
+            }
+        }
+
+        document.getElementById('btnIncome').addEventListener('click', () => setType('in'));
+        document.getElementById('btnExpense').addEventListener('click', () => setType('out'));
+        document.getElementById('editBtnIncome').addEventListener('click', () => setType('in', true));
+        document.getElementById('editBtnExpense').addEventListener('click', () => setType('out', true));
+
+        document.getElementById('transactionDate').value = new Date().toISOString().slice(0, 10);
+
+        async function fetchTransactions() {
+            try {
+                const res = await fetch('/api/budget/transactions');
+                const data = await res.json();
+                renderSummary(data.summary);
+                renderList(data.transactions);
+            } catch {
+                showToast('تعذر تحميل البيانات', 'error');
+            }
+        }
+
+        function renderSummary(s) {
+            const bal = document.getElementById('statBalance');
+            bal.textContent = fmtBalance(s.balance);
+            bal.className = `text-2xl font-bold num ${s.balance >= 0 ? 'text-amber-700' : 'text-red-600'}`;
+            const income = document.getElementById('statIncome');
+            income.textContent = fmtBalance(s.income_month);
+            income.className = 'text-2xl font-bold text-emerald-600 num';
+            const expenses = document.getElementById('statExpenses');
+            expenses.textContent = fmtBalance(s.expenses_month);
+            expenses.className = 'text-2xl font-bold text-red-600 num';
+        }
+
+        function renderList(transactions) {
+            transactionsCache = transactions;
+            const list = document.getElementById('txList');
+            const empty = document.getElementById('emptyState');
+            if (!transactions.length) {
+                list.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+            empty.classList.add('hidden');
+            list.innerHTML = transactions.map(tx => {
+                const isIncome = tx.amount > 0;
+                const amountClass = isIncome ? 'text-emerald-600' : 'text-red-600';
+                return `
+                <div class="flex items-center gap-3 py-2.5 border-b border-stone-100 last:border-0">
+                    <span class="num text-stone-400 shrink-0 w-[4.5rem]">${fmtDate(tx.transaction_date)}</span>
+                    <span class="flex-1 min-w-0 truncate text-stone-700">${escapeHtml(tx.description)}</span>
+                    <div class="shrink-0 text-left num w-[5.25rem]">
+                        <div class="font-medium ${amountClass}">${fmt(tx.amount)}</div>
+                        <div class="text-xs text-stone-400">${fmtBalance(tx.running_balance)}</div>
+                    </div>
+                    <div class="flex shrink-0 -mr-1">
+                        <button type="button" data-edit="${tx.id}" title="تعديل" aria-label="تعديل"
+                            class="p-2 rounded-md text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path stroke-linecap="round" stroke-linejoin="round" d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </button>
+                        <button type="button" data-delete="${tx.id}" title="حذف" aria-label="حذف"
+                            class="p-2 rounded-md text-stone-400 hover:text-red-600 hover:bg-red-50 transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+
+            list.querySelectorAll('[data-edit]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const tx = transactionsCache.find(t => t.id === Number(btn.dataset.edit));
+                    if (tx) openEdit(tx);
+                });
+            });
+            list.querySelectorAll('[data-delete]').forEach(btn => {
+                btn.addEventListener('click', () => deleteTx(Number(btn.dataset.delete)));
+            });
+        }
+
+        function escapeHtml(str) {
+            const d = document.createElement('div');
+            d.textContent = str;
+            return d.innerHTML;
+        }
+
+        document.getElementById('addForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const raw = parseFloat(document.getElementById('amount').value);
+            const amount = entryType === 'out' ? -Math.abs(raw) : Math.abs(raw);
+            const payload = {
+                amount,
+                transaction_date: document.getElementById('transactionDate').value,
+                description: document.getElementById('description').value.trim(),
+            };
+            try {
+                const res = await fetch('/api/budget/transactions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await res.json();
+                showToast(result.message, result.success !== false ? 'success' : 'error');
+                if (result.success !== false) {
+                    document.getElementById('amount').value = '';
+                    document.getElementById('description').value = '';
+                    fetchTransactions();
+                }
+            } catch {
+                showToast('تعذر الحفظ', 'error');
+            }
+        });
+
+        function openEdit(tx) {
+            document.getElementById('editId').value = tx.id;
+            document.getElementById('editAmount').value = Math.abs(tx.amount);
+            document.getElementById('editDate').value = tx.transaction_date;
+            document.getElementById('editDescription').value = tx.description;
+            setType(tx.amount >= 0 ? 'in' : 'out', true);
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function closeEdit() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        document.getElementById('editCancel').addEventListener('click', closeEdit);
+        document.getElementById('editBackdrop').addEventListener('click', closeEdit);
+
+        document.getElementById('editForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('editId').value;
+            const raw = parseFloat(document.getElementById('editAmount').value);
+            const amount = editType === 'out' ? -Math.abs(raw) : Math.abs(raw);
+            const payload = {
+                amount,
+                transaction_date: document.getElementById('editDate').value,
+                description: document.getElementById('editDescription').value.trim(),
+            };
+            try {
+                const res = await fetch(`/api/budget/transactions/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await res.json();
+                showToast(result.message, result.success !== false ? 'success' : 'error');
+                if (result.success !== false) {
+                    closeEdit();
+                    fetchTransactions();
+                }
+            } catch {
+                showToast('تعذر التحديث', 'error');
+            }
+        });
+
+        async function deleteTx(id) {
+            if (!confirm('حذف هذه الحركة؟')) return;
+            try {
+                const res = await fetch(`/api/budget/transactions/${id}`, { method: 'DELETE' });
+                const result = await res.json();
+                showToast(result.message, result.success !== false ? 'success' : 'error');
+                if (result.success !== false) fetchTransactions();
+            } catch {
+                showToast('تعذر الحذف', 'error');
+            }
+        }
+
+        fetchTransactions();
+    </script>
+</body>
+</html>

@@ -90,6 +90,15 @@ def init_db():
     cursor.execute(
         "DELETE FROM matings WHERE sheep_tag_id NOT IN (SELECT tag_id FROM sheep)"
     )
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS budget_transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            transaction_date TEXT NOT NULL,
+            amount REAL NOT NULL,
+            description TEXT,
+            created_at TEXT NOT NULL
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -324,8 +333,13 @@ def normalize_birth_date(birth_date):
 
 @app.route('/')
 def index():
-    """Renders the dashboard."""
+    """Renders the sheep logger dashboard."""
     return render_template('index.html')
+
+@app.route('/budget')
+def budget():
+    """Renders the farm budget tracker."""
+    return render_template('budget.html')
 
 @app.route('/api/breeds', methods=['GET'])
 def get_breeds():
@@ -716,6 +730,178 @@ def delete_ultrasound(ultrasound_id):
         conn.commit()
         conn.close()
         return jsonify({"success": True, "message": "تم حذف سجل السونار."})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+def parse_amount(value):
+    if value is None or value == '':
+        return None
+    try:
+        amount = float(value)
+    except (TypeError, ValueError):
+        return 'invalid'
+    if amount == 0:
+        return 'invalid'
+    return amount
+
+def budget_row_to_dict(row, running_balance=None):
+    return {
+        "id": row[0],
+        "transaction_date": row[1],
+        "amount": row[2],
+        "description": row[3] or '',
+        "created_at": row[4],
+        "running_balance": running_balance,
+    }
+
+def fetch_budget_summary(cursor):
+    cursor.execute(
+        "SELECT COALESCE(SUM(amount), 0) FROM budget_transactions"
+    )
+    balance = round(cursor.fetchone()[0], 2)
+
+    month_start = date.today().replace(day=1).isoformat()
+    cursor.execute(
+        "SELECT COALESCE(SUM(amount), 0) FROM budget_transactions WHERE amount > 0 AND transaction_date >= ?",
+        (month_start,),
+    )
+    income_month = round(cursor.fetchone()[0], 2)
+    cursor.execute(
+        "SELECT COALESCE(SUM(amount), 0) FROM budget_transactions WHERE amount < 0 AND transaction_date >= ?",
+        (month_start,),
+    )
+    expenses_month = round(abs(cursor.fetchone()[0]), 2)
+
+    return {
+        "balance": balance,
+        "income_month": income_month,
+        "expenses_month": expenses_month,
+    }
+
+@app.route('/api/budget/transactions', methods=['GET'])
+def get_budget_transactions():
+    conn = get_connection()
+    cursor = conn.cursor()
+    summary = fetch_budget_summary(cursor)
+    cursor.execute(
+        "SELECT id, transaction_date, amount, description, created_at "
+        "FROM budget_transactions ORDER BY transaction_date ASC, id ASC"
+    )
+    rows = cursor.fetchall()
+    running = 0.0
+    with_balance = []
+    for row in rows:
+        running = round(running + row[2], 2)
+        with_balance.append(budget_row_to_dict(row, running))
+    with_balance.reverse()
+    conn.close()
+    return jsonify({"summary": summary, "transactions": with_balance})
+
+@app.route('/api/budget/transactions', methods=['POST'])
+def add_budget_transaction():
+    data = request.json or {}
+    transaction_date = (data.get('transaction_date') or '').strip()
+    description = (data.get('description') or '').strip()
+    amount = parse_amount(data.get('amount'))
+
+    if not transaction_date:
+        transaction_date = date.today().isoformat()
+    elif not parse_date(transaction_date):
+        return jsonify({"success": False, "message": "تاريخ غير صالح."}), 400
+    if amount == 'invalid':
+        return jsonify({"success": False, "message": "المبلغ يجب أن يكون رقماً غير صفري."}), 400
+    if not description:
+        return jsonify({"success": False, "message": "الوصف مطلوب."}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO budget_transactions (transaction_date, amount, description, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (transaction_date, round(amount, 2), description, now_iso()),
+        )
+        conn.commit()
+        new_id = cursor.lastrowid
+        conn.close()
+        return jsonify({"success": True, "message": "تم تسجيل الحركة.", "id": new_id})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/budget/transactions/<int:transaction_id>', methods=['PUT'])
+def update_budget_transaction(transaction_id):
+    data = request.json or {}
+    transaction_date = data.get('transaction_date')
+    description = data.get('description')
+    amount_raw = data.get('amount')
+
+    if transaction_date is not None:
+        transaction_date = transaction_date.strip()
+        if not parse_date(transaction_date):
+            return jsonify({"success": False, "message": "تاريخ غير صالح."}), 400
+    if description is not None:
+        description = description.strip()
+        if not description:
+            return jsonify({"success": False, "message": "الوصف مطلوب."}), 400
+    amount = None
+    if amount_raw is not None:
+        amount = parse_amount(amount_raw)
+        if amount == 'invalid':
+            return jsonify({"success": False, "message": "المبلغ يجب أن يكون رقماً غير صفري."}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id FROM budget_transactions WHERE id = ?",
+            (transaction_id,),
+        )
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({"success": False, "message": "الحركة غير موجودة."}), 404
+
+        updates = []
+        values = []
+        if transaction_date is not None:
+            updates.append("transaction_date = ?")
+            values.append(transaction_date)
+        if description is not None:
+            updates.append("description = ?")
+            values.append(description)
+        if amount is not None:
+            updates.append("amount = ?")
+            values.append(round(amount, 2))
+
+        if not updates:
+            conn.close()
+            return jsonify({"success": False, "message": "لا توجد بيانات للتحديث."}), 400
+
+        values.append(transaction_id)
+        cursor.execute(
+            f"UPDATE budget_transactions SET {', '.join(updates)} WHERE id = ?",
+            values,
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "تم تحديث الحركة."})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/budget/transactions/<int:transaction_id>', methods=['DELETE'])
+def delete_budget_transaction(transaction_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM budget_transactions WHERE id = ?",
+            (transaction_id,),
+        )
+        if cursor.rowcount == 0:
+            conn.close()
+            return jsonify({"success": False, "message": "الحركة غير موجودة."}), 404
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "تم حذف الحركة."})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
