@@ -52,23 +52,36 @@ def init_db():
             sheep_tag_id TEXT NOT NULL,
             mated_date TEXT NOT NULL,
             notes TEXT,
+            mating_type TEXT,
             result TEXT,
             completed_at TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY (sheep_tag_id) REFERENCES sheep(tag_id) ON DELETE CASCADE
         )
     ''')
+    cursor.execute("PRAGMA table_info(matings)")
+    mating_columns = {row[1] for row in cursor.fetchall()}
+    if 'mating_type' not in mating_columns:
+        cursor.execute("ALTER TABLE matings ADD COLUMN mating_type TEXT")
+    cursor.execute(
+        "UPDATE matings SET mating_type = 'natural' WHERE mating_type IS NULL OR mating_type = ''"
+    )
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS ultrasounds (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             mating_id INTEGER NOT NULL,
             scan_date TEXT NOT NULL,
             result TEXT NOT NULL,
+            fetus_count INTEGER,
             notes TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY (mating_id) REFERENCES matings(id) ON DELETE CASCADE
         )
     ''')
+    cursor.execute("PRAGMA table_info(ultrasounds)")
+    ultrasound_columns = {row[1] for row in cursor.fetchall()}
+    if 'fetus_count' not in ultrasound_columns:
+        cursor.execute("ALTER TABLE ultrasounds ADD COLUMN fetus_count INTEGER")
     cursor.execute("UPDATE sheep SET mother_status = 'أم' WHERE mother_status = 'آم'")
     cursor.execute("UPDATE sheep SET mother_status = 'ليس أم بعد' WHERE mother_status IN ('ليس ام بعد', 'غير محدد') OR mother_status IS NULL OR mother_status = ''")
     cursor.execute("UPDATE sheep SET life_status = 'حي' WHERE life_status IS NULL OR life_status = ''")
@@ -91,8 +104,19 @@ def parse_date(value):
     except ValueError:
         return None
 
-def mating_needs_review(mated_date, result):
-    if result:
+def parse_fetus_count(value):
+    if value is None or value == '':
+        return None
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        return 'invalid'
+    if count < 0:
+        return 'invalid'
+    return count
+
+def mating_needs_review(mated_date, completed_at, ultrasounds):
+    if completed_at or ultrasounds:
         return False
     mated = parse_date(mated_date)
     if not mated:
@@ -116,7 +140,10 @@ def sheep_row_to_dict(row, matings=None):
         "child_count": row[12],
         "pregnancy_status": row[13] or 'غير حامل',
         "matings": matings or [],
-        "needs_mating_review": any(m.get('needs_review') for m in (matings or [])),
+        "needs_mating_review": any(
+            mating_needs_review(m.get('mated_date'), m.get('completed_at'), m.get('ultrasounds'))
+            for m in (matings or [])
+        ),
     }
 
 SHEEP_SELECT = """
@@ -163,7 +190,7 @@ def compute_pregnancy_status(cursor, tag_id):
         return 'غير حامل'
 
     cursor.execute('''
-        SELECT m.id, m.result
+        SELECT m.id
         FROM matings m
         WHERE m.sheep_tag_id = ? AND m.completed_at IS NULL
         ORDER BY m.mated_date DESC, m.id DESC
@@ -173,12 +200,7 @@ def compute_pregnancy_status(cursor, tag_id):
     if not mating:
         return 'غير حامل'
 
-    mating_id, mating_result = mating
-    if mating_result == 'fail':
-        return 'غير حامل'
-
-    if mating_result != 'pass':
-        return 'انتظار السونار'
+    mating_id = mating[0]
 
     cursor.execute('''
         SELECT result FROM ultrasounds
@@ -188,7 +210,7 @@ def compute_pregnancy_status(cursor, tag_id):
     ''', (mating_id,))
     latest_ultrasound = cursor.fetchone()
     if not latest_ultrasound:
-        return 'انتظار السونار'
+        return 'غير حامل'
 
     if latest_ultrasound[0] == 'pass':
         return 'حامل'
@@ -216,7 +238,7 @@ def close_active_pregnancy(cursor, tag_id, completed_at=None):
     completed_at = completed_at or now_iso()
     cursor.execute('''
         SELECT m.id FROM matings m
-        WHERE m.sheep_tag_id = ? AND m.result = 'pass' AND m.completed_at IS NULL
+        WHERE m.sheep_tag_id = ? AND m.completed_at IS NULL
           AND EXISTS (
               SELECT 1 FROM ultrasounds u
               WHERE u.mating_id = m.id AND u.result = 'pass'
@@ -234,7 +256,7 @@ def close_active_pregnancy(cursor, tag_id, completed_at=None):
 
 def fetch_matings_for_sheep(cursor, tag_id):
     cursor.execute('''
-        SELECT id, mated_date, notes, result, completed_at, created_at
+        SELECT id, mated_date, notes, mating_type, completed_at, created_at
         FROM matings
         WHERE sheep_tag_id = ?
         ORDER BY mated_date DESC, id DESC
@@ -243,7 +265,7 @@ def fetch_matings_for_sheep(cursor, tag_id):
     for row in cursor.fetchall():
         mating_id = row[0]
         cursor.execute('''
-            SELECT id, scan_date, result, notes, created_at
+            SELECT id, scan_date, result, fetus_count, notes, created_at
             FROM ultrasounds
             WHERE mating_id = ?
             ORDER BY scan_date DESC, id DESC
@@ -253,8 +275,9 @@ def fetch_matings_for_sheep(cursor, tag_id):
                 "id": u[0],
                 "scan_date": u[1],
                 "result": u[2],
-                "notes": u[3] or '',
-                "created_at": u[4],
+                "fetus_count": u[3],
+                "notes": u[4] or '',
+                "created_at": u[5],
             }
             for u in cursor.fetchall()
         ]
@@ -262,10 +285,9 @@ def fetch_matings_for_sheep(cursor, tag_id):
             "id": mating_id,
             "mated_date": row[1],
             "notes": row[2] or '',
-            "result": row[3],
+            "mating_type": row[3] or 'natural',
             "completed_at": row[4],
             "created_at": row[5],
-            "needs_review": mating_needs_review(row[1], row[3]),
             "ultrasounds": ultrasounds,
         })
     return matings
@@ -291,7 +313,7 @@ def validate_ewe_for_mating(cursor, tag_id):
 
 def get_mating_or_404(cursor, mating_id):
     cursor.execute(
-        "SELECT id, sheep_tag_id, mated_date, notes, result, completed_at FROM matings WHERE id = ?",
+        "SELECT id, sheep_tag_id, mated_date, notes, mating_type, completed_at FROM matings WHERE id = ?",
         (mating_id,),
     )
     return cursor.fetchone()
@@ -469,11 +491,14 @@ def add_mating(tag_id):
     data = request.json or {}
     mated_date = (data.get('mated_date') or '').strip()
     notes = (data.get('notes') or '').strip()
+    mating_type = (data.get('mating_type') or '').strip()
 
     if not mated_date:
         return jsonify({"success": False, "message": "الرجاء إدخال تاريخ التلقيح."}), 400
     if not parse_date(mated_date):
         return jsonify({"success": False, "message": "تاريخ التلقيح غير صالح."}), 400
+    if mating_type not in ('natural', 'hormone'):
+        return jsonify({"success": False, "message": "الرجاء اختيار نوع التلقيح (طبيعي أو هرمون)."}), 400
 
     try:
         conn = get_connection()
@@ -484,9 +509,9 @@ def add_mating(tag_id):
             return jsonify({"success": False, "message": message}), 400
 
         cursor.execute('''
-            INSERT INTO matings (sheep_tag_id, mated_date, notes, created_at)
-            VALUES (?, ?, ?, ?)
-        ''', (tag_id, mated_date, notes, now_iso()))
+            INSERT INTO matings (sheep_tag_id, mated_date, notes, mating_type, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (tag_id, mated_date, notes, mating_type, now_iso()))
         sync_pregnancy_status(cursor, tag_id)
         conn.commit()
         conn.close()
@@ -497,10 +522,9 @@ def add_mating(tag_id):
 @app.route('/api/matings/<int:mating_id>', methods=['PATCH'])
 def update_mating(mating_id):
     data = request.json or {}
-    result = data.get('result')
     notes = data.get('notes')
 
-    if result is None and notes is None:
+    if notes is None:
         return jsonify({"success": False, "message": "لا توجد بيانات للتحديث."}), 400
 
     try:
@@ -511,37 +535,13 @@ def update_mating(mating_id):
             conn.close()
             return jsonify({"success": False, "message": "سجل التلقيح غير موجود."}), 404
 
-        if notes is not None and result is None:
-            cursor.execute(
-                "UPDATE matings SET notes = ? WHERE id = ?",
-                ((notes or '').strip(), mating_id),
-            )
-            conn.commit()
-            conn.close()
-            return jsonify({"success": True, "message": "تم حفظ الملاحظة."})
-
-        result = (result or '').strip()
-        if result not in ('pass', 'fail'):
-            return jsonify({"success": False, "message": "النتيجة يجب أن تكون pass أو fail."}), 400
-        if row[4] is not None:
-            conn.close()
-            return jsonify({"success": False, "message": "تم تحديد نتيجة هذا التلقيح مسبقاً."}), 400
-
-        if notes is not None:
-            cursor.execute(
-                "UPDATE matings SET result = ?, notes = ? WHERE id = ?",
-                (result, (notes or '').strip(), mating_id),
-            )
-        else:
-            cursor.execute(
-                "UPDATE matings SET result = ? WHERE id = ?",
-                (result, mating_id),
-            )
-        sync_pregnancy_status(cursor, row[1])
+        cursor.execute(
+            "UPDATE matings SET notes = ? WHERE id = ?",
+            ((notes or '').strip(), mating_id),
+        )
         conn.commit()
         conn.close()
-        label = 'ناجح' if result == 'pass' else 'فاشل'
-        return jsonify({"success": True, "message": f"تم تسجيل التلقيح كـ {label}."})
+        return jsonify({"success": True, "message": "تم حفظ الملاحظة."})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
@@ -573,7 +573,14 @@ def complete_mating(mating_id):
         if not row:
             conn.close()
             return jsonify({"success": False, "message": "سجل التلقيح غير موجود."}), 404
-        if row[4] != 'pass':
+        if row[5] is not None:
+            conn.close()
+            return jsonify({"success": False, "message": "تم إغلاق دورة هذا التلقيح."}), 400
+        cursor.execute(
+            "SELECT 1 FROM ultrasounds WHERE mating_id = ? AND result = 'pass' LIMIT 1",
+            (mating_id,),
+        )
+        if not cursor.fetchone():
             conn.close()
             return jsonify({"success": False, "message": "يمكن إغلاق دورة حمل ناجحة فقط."}), 400
         cursor.execute(
@@ -593,6 +600,7 @@ def add_ultrasound(mating_id):
     scan_date = (data.get('scan_date') or '').strip()
     result = (data.get('result') or '').strip()
     notes = (data.get('notes') or '').strip()
+    fetus_count = parse_fetus_count(data.get('fetus_count'))
 
     if not scan_date:
         return jsonify({"success": False, "message": "الرجاء إدخال تاريخ السونار."}), 400
@@ -600,6 +608,8 @@ def add_ultrasound(mating_id):
         return jsonify({"success": False, "message": "تاريخ السونار غير صالح."}), 400
     if result not in ('pass', 'fail'):
         return jsonify({"success": False, "message": "النتيجة يجب أن تكون pass أو fail."}), 400
+    if fetus_count == 'invalid':
+        return jsonify({"success": False, "message": "عدد الأجنة يجب أن يكون رقماً صحيحاً (٠ أو أكثر)."}), 400
 
     try:
         conn = get_connection()
@@ -608,14 +618,14 @@ def add_ultrasound(mating_id):
         if not row:
             conn.close()
             return jsonify({"success": False, "message": "سجل التلقيح غير موجود."}), 404
-        if row[4] != 'pass':
+        if row[5] is not None:
             conn.close()
-            return jsonify({"success": False, "message": "السونار متاح فقط بعد نجاح التلقيح."}), 400
+            return jsonify({"success": False, "message": "تم إغلاق دورة هذا التلقيح."}), 400
 
         cursor.execute('''
-            INSERT INTO ultrasounds (mating_id, scan_date, result, notes, created_at)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (mating_id, scan_date, result, notes, now_iso()))
+            INSERT INTO ultrasounds (mating_id, scan_date, result, fetus_count, notes, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (mating_id, scan_date, result, fetus_count, notes, now_iso()))
         sync_pregnancy_status(cursor, row[1])
         conn.commit()
         conn.close()
@@ -630,11 +640,16 @@ def update_ultrasound(ultrasound_id):
     scan_date = data.get('scan_date')
     result = data.get('result')
     notes = data.get('notes')
+    fetus_count_raw = data.get('fetus_count')
 
     if result is not None and result not in ('pass', 'fail'):
         return jsonify({"success": False, "message": "النتيجة يجب أن تكون pass أو fail."}), 400
     if scan_date is not None and not parse_date(scan_date):
         return jsonify({"success": False, "message": "تاريخ السونار غير صالح."}), 400
+    if fetus_count_raw is not None:
+        fetus_count = parse_fetus_count(fetus_count_raw)
+        if fetus_count == 'invalid':
+            return jsonify({"success": False, "message": "عدد الأجنة يجب أن يكون رقماً صحيحاً (٠ أو أكثر)."}), 400
 
     try:
         conn = get_connection()
@@ -661,6 +676,9 @@ def update_ultrasound(ultrasound_id):
         if notes is not None:
             updates.append("notes = ?")
             values.append(notes.strip())
+        if fetus_count_raw is not None:
+            updates.append("fetus_count = ?")
+            values.append(parse_fetus_count(fetus_count_raw))
 
         if not updates:
             conn.close()

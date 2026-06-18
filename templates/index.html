@@ -42,8 +42,8 @@
                     <div class="text-xs text-stone-500 mt-0.5">حامل</div>
                 </div>
                 <div class="bg-white border border-stone-200 rounded-xl p-3 shadow-sm">
-                    <div id="statAwaitingSonar" class="text-2xl font-bold text-amber-600">0</div>
-                    <div class="text-xs text-stone-500 mt-0.5">انتظار السونار</div>
+                    <div id="statNotPregnant" class="text-2xl font-bold text-stone-500">0</div>
+                    <div class="text-xs text-stone-500 mt-0.5">غير حامل</div>
                 </div>
             </div>
         </header>
@@ -91,7 +91,7 @@
                     </div>
                     <div class="space-y-4">
                         <div>
-                            <span class="text-xs font-medium text-stone-500 mb-2 block">وقت من الولادة</span>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">عمر</span>
                             <div class="flex flex-wrap items-center gap-2">
                                 <input type="number" id="ageFilterMin" min="0" step="1" placeholder="من"
                                     class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
@@ -107,14 +107,15 @@
                             </div>
                         </div>
                         <div>
-                            <span class="text-xs font-medium text-stone-500 mb-2 block">وقت من آخر تلقيح</span>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <input type="number" id="matingSinceMin" min="0" step="1" placeholder="من"
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">المدة منذ آخر تلقيح (الدورة الحالية)</span>
+                            <div id="activeCycleAgeFilters" class="flex flex-wrap gap-1.5 mb-2"></div>
+                            <div id="activeCycleCustomFields" class="hidden flex flex-wrap items-center gap-2">
+                                <input type="number" id="activeCycleMin" min="0" step="1" placeholder="من"
                                     class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
                                 <span class="text-stone-400 text-xs">—</span>
-                                <input type="number" id="matingSinceMax" min="0" step="1" placeholder="إلى"
+                                <input type="number" id="activeCycleMax" min="0" step="1" placeholder="إلى"
                                     class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
-                                <select id="matingSinceUnit"
+                                <select id="activeCycleUnit"
                                     class="bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
                                     <option value="days">يوم</option>
                                     <option value="months">شهر</option>
@@ -123,20 +124,8 @@
                             </div>
                         </div>
                         <div>
-                            <span class="text-xs font-medium text-stone-500 mb-2 block">وقت من آخر سونار</span>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <input type="number" id="sonarSinceMin" min="0" step="1" placeholder="من"
-                                    class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
-                                <span class="text-stone-400 text-xs">—</span>
-                                <input type="number" id="sonarSinceMax" min="0" step="1" placeholder="إلى"
-                                    class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
-                                <select id="sonarSinceUnit"
-                                    class="bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
-                                    <option value="days">يوم</option>
-                                    <option value="months">شهر</option>
-                                    <option value="years">سنة</option>
-                                </select>
-                            </div>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">سونار الدورة الحالية</span>
+                            <div id="activeSonarFilters" class="flex flex-wrap gap-1.5"></div>
                         </div>
                     </div>
                     <div class="pb-4">
@@ -304,12 +293,30 @@
                     <label id="reproDateLabel" class="block text-sm font-medium mb-1 text-stone-700">تاريخ التلقيح</label>
                     <input type="date" id="reproDate" required class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
                 </div>
+                <div id="reproMatingTypeGroup">
+                    <label class="block text-sm font-medium mb-2 text-stone-700">نوع التلقيح</label>
+                    <div class="flex flex-wrap gap-2">
+                        <label class="flex-1 min-w-[120px] cursor-pointer">
+                            <input type="radio" name="mating_type" value="natural" class="peer sr-only" checked>
+                            <span class="block text-center text-sm font-medium px-3 py-2 rounded-lg border transition peer-checked:bg-lime-600 peer-checked:text-white peer-checked:border-lime-600 border-stone-300 text-stone-700 hover:bg-stone-100">طبيعي</span>
+                        </label>
+                        <label class="flex-1 min-w-[120px] cursor-pointer">
+                            <input type="radio" name="mating_type" value="hormone" class="peer sr-only">
+                            <span class="block text-center text-sm font-medium px-3 py-2 rounded-lg border transition peer-checked:bg-lime-600 peer-checked:text-white peer-checked:border-lime-600 border-stone-300 text-stone-700 hover:bg-stone-100">هرمون</span>
+                        </label>
+                    </div>
+                </div>
                 <div id="reproResultGroup" class="hidden">
                     <label class="block text-sm font-medium mb-1 text-stone-700">النتيجة</label>
                     <select id="reproResult" class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
                         <option value="pass">ناجح</option>
                         <option value="fail">فاشل</option>
                     </select>
+                </div>
+                <div id="reproFetusGroup" class="hidden">
+                    <label class="block text-sm font-medium mb-1 text-stone-700">عدد الأجنة <span class="text-stone-400 font-normal">(اختياري)</span></label>
+                    <input type="number" id="reproFetusCount" min="0" step="1" placeholder="مثال: 2"
+                        class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1 text-stone-700">ملاحظات</label>
@@ -330,6 +337,8 @@
         let activeMotherFilter = '';
         let activeGenderFilter = '';
         let activePregnancyFilter = '';
+        let activeCycleAgeFilter = '';
+        let activeSonarFilter = '';
         let filtersExpanded = false;
         let expandedCards = new Set();
 
@@ -354,8 +363,20 @@
         const PREGNANCY_FILTER_OPTIONS = [
             { value: '', label: 'الكل' },
             { value: 'غير حامل', label: 'غير حامل' },
-            { value: 'انتظار السونار', label: 'انتظار السونار' },
             { value: 'حامل', label: 'حامل' },
+        ];
+
+        const ACTIVE_CYCLE_AGE_FILTER_OPTIONS = [
+            { value: '', label: 'الكل' },
+            { value: '1m', label: 'شهر' },
+            { value: '2.5m', label: 'شهران ونصف' },
+            { value: 'custom', label: 'مخصص' },
+        ];
+
+        const ACTIVE_SONAR_FILTER_OPTIONS = [
+            { value: '', label: 'الكل' },
+            { value: 'none', label: 'لم يتم عمل سونار' },
+            { value: 'one', label: 'تم عمل سونار واحد فقط' },
         ];
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -363,6 +384,8 @@
             renderPregnancyFilters();
             renderMotherFilters();
             renderGenderFilters();
+            renderActiveCycleAgeFilters();
+            renderActiveSonarFilters();
             fetchSheep();
             fetchBreeds();
             document.querySelectorAll('input[name="sheep_origin"]').forEach(radio => {
@@ -487,26 +510,29 @@
         }
 
         function reproStatusClass(status) {
-            if (status === 'حامل') return 'bg-violet-100 text-violet-700';
-            if (status === 'انتظار السونار') return 'bg-amber-100 text-amber-700';
-            return 'bg-stone-100 text-stone-600';
+            return status === 'حامل' ? 'bg-violet-100 text-violet-700' : 'bg-stone-100 text-stone-600';
         }
 
-        function matingResultLabel(result) {
-            if (result === 'pass') return 'ناجح';
-            if (result === 'fail') return 'فاشل';
-            return 'بانتظار المراجعة';
+        function matingTypeLabel(type) {
+            return type === 'hormone' ? 'هرمون' : 'طبيعي';
         }
 
-        function matingResultClass(result, needsReview) {
-            if (result === 'pass') return 'bg-emerald-100 text-emerald-700';
-            if (result === 'fail') return 'bg-red-100 text-red-700';
-            if (needsReview) return 'bg-amber-100 text-amber-800';
-            return 'bg-stone-100 text-stone-600';
+        function matingTypeClass(type) {
+            return type === 'hormone' ? 'bg-violet-100 text-violet-700' : 'bg-sky-100 text-sky-700';
         }
 
         function ultrasoundResultClass(result) {
             return result === 'pass' ? 'text-emerald-700' : 'text-red-600';
+        }
+
+        function fetusCountLabel(count) {
+            const n = Number(count);
+            if (!Number.isFinite(n) || n < 0) return '';
+            if (n === 0) return 'لا أجنة';
+            if (n === 1) return 'جنين واحد';
+            if (n === 2) return 'جنينان';
+            if (n <= 10) return `${n} أجنة`;
+            return `${n} جنيناً`;
         }
 
         function renderReproNoteInput(type, id, notes) {
@@ -536,17 +562,11 @@
                 matingsHtml = '<p class="text-sm text-stone-500">لا توجد سجلات تلقيح بعد</p>';
             } else {
                 matingsHtml = matings.map(m => {
-                    const resultBadge = `<span class="text-xs font-medium px-2 py-0.5 rounded-full ${matingResultClass(m.result, m.needs_review)}">${escapeHtml(matingResultLabel(m.result))}${m.needs_review ? ' (20+ يوم)' : ''}</span>`;
+                    const typeBadge = `<span class="text-xs font-medium px-2 py-0.5 rounded-full ${matingTypeClass(m.mating_type)}">${escapeHtml(matingTypeLabel(m.mating_type))}</span>`;
                     const completedLine = m.completed_at ? `<p class="text-xs text-stone-400 mt-1.5">دورة مغلقة</p>` : '';
 
                     let actionsHtml = '';
-                    if (!m.result) {
-                        actionsHtml = `
-                            <div class="flex flex-wrap gap-2 mt-2 justify-end">
-                                <button data-action="mating-pass" data-id="${m.id}" class="text-xs font-semibold px-2.5 py-1 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition">نجاح</button>
-                                <button data-action="mating-fail" data-id="${m.id}" class="text-xs font-semibold px-2.5 py-1 rounded-md bg-red-600 text-white hover:bg-red-700 transition">فشل</button>
-                            </div>`;
-                    } else if (m.result === 'pass' && !m.completed_at) {
+                    if (!m.completed_at) {
                         actionsHtml = `
                             <div class="flex flex-wrap gap-2 mt-2 justify-end">
                                 <button data-action="add-ultrasound" data-id="${m.id}" data-tag="${safeTag}" class="text-xs font-semibold px-2.5 py-1 rounded-md bg-violet-600 text-white hover:bg-violet-700 transition">+ سونار</button>
@@ -557,7 +577,7 @@
                     const deleteBtn = `<button data-action="delete-mating" data-id="${m.id}" class="text-xs font-medium px-2.5 py-1 rounded-md text-stone-500 hover:text-red-600 hover:bg-red-50 transition">حذف</button>`;
 
                     let ultrasoundsHtml = '';
-                    if (m.result === 'pass' && m.ultrasounds && m.ultrasounds.length) {
+                    if (m.ultrasounds && m.ultrasounds.length) {
                         ultrasoundsHtml = `
                             <div class="mt-2 mr-2 pr-3 border-r-2 border-violet-200 space-y-2">
                                 <div class="text-xs font-bold text-stone-500">سونار</div>
@@ -568,6 +588,7 @@
                                             <div class="flex-1 text-right">
                                                 <span class="font-medium">${escapeHtml(u.scan_date)}</span>
                                                 <span class="text-xs font-semibold mr-2 ${ultrasoundResultClass(u.result)}">${u.result === 'pass' ? 'ناجح' : 'فاشل'}</span>
+                                                ${u.fetus_count != null && u.fetus_count !== '' ? `<span class="text-xs text-stone-500 mr-2">${escapeHtml(fetusCountLabel(u.fetus_count))}</span>` : ''}
                                             </div>
                                         </div>
                                         ${renderReproNoteInput('ultrasound', u.id, u.notes)}
@@ -581,7 +602,7 @@
                             <div class="flex justify-between items-center gap-2">
                                 <div class="flex items-center gap-2 flex-wrap min-w-0">
                                     <div class="text-sm font-semibold text-stone-800 shrink-0">تلقيح ${escapeHtml(m.mated_date)}</div>
-                                    ${resultBadge}
+                                    ${typeBadge}
                                 </div>
                                 ${deleteBtn}
                             </div>
@@ -604,6 +625,94 @@
                     </div>
                     <div class="space-y-2">${matingsHtml}</div>
                 </div>`;
+        }
+
+        function renderActiveCycleAgeFilters() {
+            renderFilterGroup('activeCycleAgeFilters', ACTIVE_CYCLE_AGE_FILTER_OPTIONS, activeCycleAgeFilter, 'data-cycle-age');
+        }
+
+        function renderActiveSonarFilters() {
+            renderFilterGroup('activeSonarFilters', ACTIVE_SONAR_FILTER_OPTIONS, activeSonarFilter, 'data-cycle-sonar');
+        }
+
+        function setActiveCycleAgeFilter(value) {
+            activeCycleAgeFilter = value;
+            renderActiveCycleAgeFilters();
+            document.getElementById('activeCycleCustomFields').classList.toggle('hidden', value !== 'custom');
+            if (value !== 'custom') {
+                document.getElementById('activeCycleMin').value = '';
+                document.getElementById('activeCycleMax').value = '';
+            }
+            applyFilters();
+        }
+
+        function setActiveSonarFilter(value) {
+            activeSonarFilter = value;
+            renderActiveSonarFilters();
+            applyFilters();
+        }
+
+        function getActiveMating(sheep) {
+            return (sheep.matings || []).find(m => !m.completed_at) || null;
+        }
+
+        function getActiveCycleMatingDate(sheep) {
+            const mating = getActiveMating(sheep);
+            return mating ? mating.mated_date : null;
+        }
+
+        function hasActiveCycleAgeFilter() {
+            if (activeCycleAgeFilter === 'custom') {
+                return hasDurationFilter('activeCycleMin', 'activeCycleMax');
+            }
+            return activeCycleAgeFilter !== '';
+        }
+
+        function hasActiveSonarFilter() {
+            return activeSonarFilter !== '';
+        }
+
+        function getActiveCycleAgeSummaryLabel() {
+            if (activeCycleAgeFilter === '1m') return 'مدة الدورة: شهر+';
+            if (activeCycleAgeFilter === '2.5m') return 'مدة الدورة: شهران ونصف+';
+            if (activeCycleAgeFilter === 'custom') {
+                return getDurationFilterSummaryLabel('activeCycleMin', 'activeCycleMax', 'activeCycleUnit', 'مدة الدورة');
+            }
+            return null;
+        }
+
+        function getActiveSonarSummaryLabel() {
+            if (activeSonarFilter === 'none') return 'سونار الدورة: لم يتم';
+            if (activeSonarFilter === 'one') return 'سونار الدورة: واحد فقط';
+            return null;
+        }
+
+        function matchesActiveCycleAgeFilter(sheep) {
+            const date = getActiveCycleMatingDate(sheep);
+            if (!date) return false;
+
+            if (activeCycleAgeFilter === '1m') {
+                const days = getDaysSince(date);
+                return days !== null && days >= 30;
+            }
+            if (activeCycleAgeFilter === '2.5m') {
+                const days = getDaysSince(date);
+                return days !== null && days >= 75;
+            }
+            if (activeCycleAgeFilter === 'custom') {
+                return matchesDurationSinceFilter(date, 'activeCycleMin', 'activeCycleMax', 'activeCycleUnit');
+            }
+            return true;
+        }
+
+        function matchesActiveSonarFilter(sheep) {
+            if (!activeSonarFilter) return true;
+            const mating = getActiveMating(sheep);
+            if (!mating) return false;
+            const count = (mating.ultrasounds || []).length;
+            if (activeSonarFilter === 'none') return count === 0;
+            if (activeSonarFilter === 'one') return count === 1;
+            return true;
         }
 
         function renderPregnancyFilters() {
@@ -702,27 +811,6 @@
             return true;
         }
 
-        function getLatestMatingDate(sheep) {
-            const matings = sheep.matings || [];
-            if (!matings.length) return null;
-            return matings.reduce((latest, m) => {
-                if (!m.mated_date) return latest;
-                return !latest || m.mated_date > latest ? m.mated_date : latest;
-            }, null);
-        }
-
-        function getLatestSonarDate(sheep) {
-            const matings = sheep.matings || [];
-            let latest = null;
-            for (const m of matings) {
-                for (const u of (m.ultrasounds || [])) {
-                    if (!u.scan_date) continue;
-                    if (!latest || u.scan_date > latest) latest = u.scan_date;
-                }
-            }
-            return latest;
-        }
-
         function getAgeFilterValues() {
             return getDurationFilterValues('ageFilterMin', 'ageFilterMax', 'ageFilterUnit');
         }
@@ -732,11 +820,11 @@
         }
 
         function hasMatingSinceFilter() {
-            return hasDurationFilter('matingSinceMin', 'matingSinceMax');
+            return hasActiveCycleAgeFilter();
         }
 
         function hasSonarSinceFilter() {
-            return hasDurationFilter('sonarSinceMin', 'sonarSinceMax');
+            return hasActiveSonarFilter();
         }
 
         function getAgeFilterNormalizedBounds() {
@@ -744,7 +832,7 @@
         }
 
         function getAgeFilterSummaryLabel() {
-            return getDurationFilterSummaryLabel('ageFilterMin', 'ageFilterMax', 'ageFilterUnit', 'وقت من الولادة');
+            return getDurationFilterSummaryLabel('ageFilterMin', 'ageFilterMax', 'ageFilterUnit', 'عمر');
         }
 
         function getAgeDays(birthDate) {
@@ -760,11 +848,11 @@
         }
 
         function matchesMatingSinceFilter(sheep) {
-            return matchesDurationSinceFilter(getLatestMatingDate(sheep), 'matingSinceMin', 'matingSinceMax', 'matingSinceUnit');
+            return matchesActiveCycleAgeFilter(sheep);
         }
 
         function matchesSonarSinceFilter(sheep) {
-            return matchesDurationSinceFilter(getLatestSonarDate(sheep), 'sonarSinceMin', 'sonarSinceMax', 'sonarSinceUnit');
+            return matchesActiveSonarFilter(sheep);
         }
 
         function hasActiveFilters() {
@@ -779,10 +867,10 @@
             if (activeGenderFilter) parts.push(activeGenderFilter);
             const ageLabel = getAgeFilterSummaryLabel();
             if (ageLabel) parts.push(ageLabel);
-            const matingSinceLabel = getDurationFilterSummaryLabel('matingSinceMin', 'matingSinceMax', 'matingSinceUnit', 'وقت من آخر تلقيح');
-            if (matingSinceLabel) parts.push(matingSinceLabel);
-            const sonarSinceLabel = getDurationFilterSummaryLabel('sonarSinceMin', 'sonarSinceMax', 'sonarSinceUnit', 'وقت من آخر سونار');
-            if (sonarSinceLabel) parts.push(sonarSinceLabel);
+            const cycleAgeLabel = getActiveCycleAgeSummaryLabel();
+            if (cycleAgeLabel) parts.push(cycleAgeLabel);
+            const sonarLabel = getActiveSonarSummaryLabel();
+            if (sonarLabel) parts.push(sonarLabel);
             if (activeBreedFilter) parts.push(activeBreedFilter);
             return parts;
         }
@@ -811,19 +899,21 @@
             activeMotherFilter = '';
             activeGenderFilter = '';
             activePregnancyFilter = '';
+            activeCycleAgeFilter = '';
+            activeSonarFilter = '';
             document.getElementById('ageFilterMin').value = '';
             document.getElementById('ageFilterMax').value = '';
             document.getElementById('ageFilterUnit').value = 'months';
-            document.getElementById('matingSinceMin').value = '';
-            document.getElementById('matingSinceMax').value = '';
-            document.getElementById('matingSinceUnit').value = 'days';
-            document.getElementById('sonarSinceMin').value = '';
-            document.getElementById('sonarSinceMax').value = '';
-            document.getElementById('sonarSinceUnit').value = 'days';
+            document.getElementById('activeCycleMin').value = '';
+            document.getElementById('activeCycleMax').value = '';
+            document.getElementById('activeCycleUnit').value = 'days';
+            document.getElementById('activeCycleCustomFields').classList.add('hidden');
             renderLifeFilters();
             renderPregnancyFilters();
             renderMotherFilters();
             renderGenderFilters();
+            renderActiveCycleAgeFilters();
+            renderActiveSonarFilters();
             renderBreedFilters();
             applyFilters();
         }
@@ -925,10 +1015,10 @@
 
         function updateStats() {
             const pregnant = allSheep.filter(s => pregnancyStatusLabel(s) === 'حامل').length;
-            const awaitingSonar = allSheep.filter(s => pregnancyStatusLabel(s) === 'انتظار السونار').length;
+            const notPregnant = allSheep.filter(s => pregnancyStatusLabel(s) === 'غير حامل').length;
             document.getElementById('statTotal').textContent = allSheep.length;
             document.getElementById('statPregnant').textContent = pregnant;
-            document.getElementById('statAwaitingSonar').textContent = awaitingSonar;
+            document.getElementById('statNotPregnant').textContent = notPregnant;
         }
 
         function renderBreedFilters() {
@@ -1188,8 +1278,11 @@
             document.getElementById('reproMatingId').value = matingId;
             document.getElementById('reproDate').value = todayDateString();
             document.getElementById('reproNotes').value = '';
+            document.getElementById('reproFetusCount').value = '';
 
+            const matingTypeGroup = document.getElementById('reproMatingTypeGroup');
             const resultGroup = document.getElementById('reproResultGroup');
+            const fetusGroup = document.getElementById('reproFetusGroup');
             const title = document.getElementById('reproModalTitle');
             const dateLabel = document.getElementById('reproDateLabel');
             const submitBtn = document.getElementById('reproSubmitBtn');
@@ -1197,13 +1290,19 @@
             if (mode === 'ultrasound') {
                 title.innerText = 'تسجيل سونار';
                 dateLabel.innerText = 'تاريخ السونار';
+                matingTypeGroup.classList.add('hidden');
                 resultGroup.classList.remove('hidden');
+                fetusGroup.classList.remove('hidden');
+                document.getElementById('reproResult').value = 'pass';
                 submitBtn.innerText = 'حفظ السونار';
                 submitBtn.className = 'w-full bg-violet-600 hover:bg-violet-700 transition font-bold py-3 px-4 rounded-lg text-white';
             } else {
                 title.innerText = 'تسجيل تلقيح';
                 dateLabel.innerText = 'تاريخ التلقيح';
+                matingTypeGroup.classList.remove('hidden');
                 resultGroup.classList.add('hidden');
+                fetusGroup.classList.add('hidden');
+                document.querySelector('input[name="mating_type"][value="natural"]').checked = true;
                 submitBtn.innerText = 'حفظ التلقيح';
                 submitBtn.className = 'w-full bg-lime-600 hover:bg-lime-700 transition font-bold py-3 px-4 rounded-lg text-white';
             }
@@ -1242,21 +1341,6 @@
                 }
             } catch (err) {
                 showToast('تعذر حفظ الملاحظة', 'error');
-            }
-        }
-
-        async function setMatingResult(matingId, result) {
-            try {
-                const response = await fetch(`/api/matings/${matingId}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ result }),
-                });
-                const data = await response.json();
-                showToast(data.message, data.success !== false ? 'success' : 'error');
-                if (data.success !== false) fetchSheep();
-            } catch (err) {
-                showToast('تعذر تحديث نتيجة التلقيح', 'error');
             }
         }
 
@@ -1388,7 +1472,17 @@
             if (chip) setPregnancyFilter(chip.getAttribute('data-pregnancy') || '');
         });
 
-        ['ageFilterMin', 'ageFilterMax', 'ageFilterUnit', 'matingSinceMin', 'matingSinceMax', 'matingSinceUnit', 'sonarSinceMin', 'sonarSinceMax', 'sonarSinceUnit'].forEach(id => {
+        document.getElementById('activeCycleAgeFilters').addEventListener('click', (e) => {
+            const chip = e.target.closest('[data-cycle-age]');
+            if (chip) setActiveCycleAgeFilter(chip.getAttribute('data-cycle-age') || '');
+        });
+
+        document.getElementById('activeSonarFilters').addEventListener('click', (e) => {
+            const chip = e.target.closest('[data-cycle-sonar]');
+            if (chip) setActiveSonarFilter(chip.getAttribute('data-cycle-sonar') || '');
+        });
+
+        ['ageFilterMin', 'ageFilterMax', 'ageFilterUnit', 'activeCycleMin', 'activeCycleMax', 'activeCycleUnit'].forEach(id => {
             document.getElementById(id).addEventListener('input', applyFilters);
             document.getElementById(id).addEventListener('change', applyFilters);
         });
@@ -1418,8 +1512,6 @@
                 else if (action === 'notes') openNotesModal(tag);
                 else if (action === 'add-mating') openReproModal('mating', tag);
                 else if (action === 'add-ultrasound') openReproModal('ultrasound', tag, id);
-                else if (action === 'mating-pass') setMatingResult(id, 'pass');
-                else if (action === 'mating-fail') setMatingResult(id, 'fail');
                 else if (action === 'delete-mating') deleteMating(id);
                 else if (action === 'complete-mating') completeMating(id);
                 else if (action === 'delete-ultrasound') deleteUltrasound(id);
@@ -1497,11 +1589,13 @@
             if (mode === 'ultrasound') {
                 url = `/api/matings/${matingId}/ultrasounds`;
                 payload.result = document.getElementById('reproResult').value;
+                const fetusRaw = document.getElementById('reproFetusCount').value.trim();
+                if (fetusRaw !== '') payload.fetus_count = Number(fetusRaw);
                 delete payload.mated_date;
             } else {
                 url = `/api/sheep/${tagId}/matings`;
+                payload.mating_type = document.querySelector('input[name="mating_type"]:checked')?.value || 'natural';
                 delete payload.scan_date;
-                delete payload.result;
             }
 
             try {
