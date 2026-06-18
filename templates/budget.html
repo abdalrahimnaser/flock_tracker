@@ -43,38 +43,33 @@
         .tx-table .col-amount { width: 8.75rem; min-width: 8.75rem; text-align: left; }
         .tx-table .col-balance { width: 8.75rem; min-width: 8.75rem; text-align: left; }
         .tx-table .col-actions { width: 4.5rem; padding-left: 0.25rem; padding-right: 0.25rem; }
-        .tx-cell-label {
-            display: none;
-            font-size: 0.6875rem;
-            font-weight: 600;
+        .tx-feed-item {
+            padding: 0.875rem 0;
+            border-bottom: 1px solid #e7e5e4;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .tx-feed-item:active { background: #fafaf9; }
+        .tx-feed-item:last-child { border-bottom: none; }
+        .tx-feed-month {
+            font-size: 0.8125rem;
+            font-weight: 700;
             color: #78716c;
-            margin-bottom: 0.25rem;
+            padding: 1rem 0 0.375rem;
         }
-        @media (max-width: 639px) {
-            .tx-table thead { display: none; }
-            .tx-table tbody tr {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 0.5rem 1rem;
-                padding: 0.875rem 0;
-                border-bottom: 1px solid #f5f5f4;
-            }
-            .tx-table tbody tr:last-child { border-bottom: none; }
-            .tx-table tbody td {
-                display: block;
-                padding: 0;
-                border: none;
-            }
-            .tx-table .col-desc { grid-column: 1 / -1; }
-            .tx-table .col-actions {
-                grid-column: 1 / -1;
-                display: flex;
-                justify-content: flex-end;
-                width: auto;
-                padding-top: 0.25rem;
-            }
-            .tx-cell-label { display: block; }
+        .tx-feed-month:first-child { padding-top: 0; }
+        .stat-box { min-width: 0; overflow: hidden; }
+        .stat-value {
+            font-size: clamp(0.8125rem, 3.2vw, 1.5rem);
+            line-height: 1.25;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
+        .filter-panel { transition: max-height 0.25s ease, opacity 0.2s ease, padding 0.25s ease; }
+        .filter-panel:not(.expanded) { padding-top: 0; padding-bottom: 0; border-width: 0; }
+        .filter-chip.selected { background: #d97706; color: white; border-color: #d97706; }
     </style>
 </head>
 <body class="text-stone-800 min-h-screen font-sans relative pb-24">
@@ -96,18 +91,18 @@
             <p class="text-stone-500 text-sm mt-1">تتبع النقدية — إيرادات ومصروفات</p>
         </header>
 
-        <div id="statsBar" class="grid grid-cols-3 gap-3 text-center mb-6">
-            <div class="bg-white border border-stone-200 rounded-xl p-4 shadow-sm">
-                <div id="statBalance" class="text-2xl font-bold text-amber-700 num">—</div>
-                <div class="text-xs text-stone-500 mt-0.5">الرصيد الحالي</div>
+        <div id="statsBar" class="grid grid-cols-3 gap-2 sm:gap-3 text-center mb-6">
+            <div class="stat-box bg-white border border-stone-200 rounded-xl p-3 sm:p-4 shadow-sm">
+                <div id="statBalance" class="stat-value font-bold text-amber-700 num">—</div>
+                <div class="text-[11px] sm:text-xs text-stone-500 mt-0.5">الرصيد الحالي</div>
             </div>
-            <div class="bg-white border border-stone-200 rounded-xl p-4 shadow-sm">
-                <div id="statIncome" class="text-2xl font-bold text-emerald-600 num">—</div>
-                <div class="text-xs text-stone-500 mt-0.5">إيرادات الشهر</div>
+            <div class="stat-box bg-white border border-stone-200 rounded-xl p-3 sm:p-4 shadow-sm">
+                <div id="statIncome" class="stat-value font-bold text-emerald-600 num">—</div>
+                <div class="text-[11px] sm:text-xs text-stone-500 mt-0.5">إيرادات الشهر</div>
             </div>
-            <div class="bg-white border border-stone-200 rounded-xl p-4 shadow-sm">
-                <div id="statExpenses" class="text-2xl font-bold text-red-600 num">—</div>
-                <div class="text-xs text-stone-500 mt-0.5">مصروفات الشهر</div>
+            <div class="stat-box bg-white border border-stone-200 rounded-xl p-3 sm:p-4 shadow-sm">
+                <div id="statExpenses" class="stat-value font-bold text-red-600 num">—</div>
+                <div class="text-[11px] sm:text-xs text-stone-500 mt-0.5">مصروفات الشهر</div>
             </div>
         </div>
 
@@ -149,12 +144,73 @@
         </section>
 
         <section class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-stone-200">
-            <h2 class="text-lg font-bold mb-4">سجل الحركات</h2>
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <h2 class="text-lg font-bold">سجل الحركات</h2>
+                <p id="resultsCount" class="text-xs text-stone-500"></p>
+            </div>
+
+            <div class="mb-4 space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                    <button type="button" id="filterToggle" aria-expanded="false"
+                        class="inline-flex items-center gap-2 px-3.5 py-2 rounded-full border border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50 transition text-sm font-medium text-stone-700 shadow-sm">
+                        <svg class="w-4 h-4 text-stone-500" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M7 12h10M10 18h4"/>
+                        </svg>
+                        <span>فلاتر</span>
+                        <span id="filterBadge" class="hidden min-w-[1.25rem] h-5 px-1.5 rounded-full bg-amber-600 text-white text-[11px] font-bold leading-none inline-flex items-center justify-center">0</span>
+                        <span id="filterChevron" class="text-stone-400 text-[10px] transition-transform duration-200 mr-0.5">▼</span>
+                    </button>
+                    <button type="button" id="clearFilters" class="hidden text-xs font-medium text-stone-500 hover:text-red-600 transition px-2 py-1 rounded-md hover:bg-red-50">
+                        مسح الفلاتر
+                    </button>
+                </div>
+
+                <div id="filterPanel" class="filter-panel rounded-2xl bg-stone-50 border border-stone-200/80 px-4 py-0 space-y-4 max-h-0 opacity-0 overflow-hidden">
+                    <div class="pt-4 space-y-4">
+                        <div>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">نوع الحركة</span>
+                            <div class="flex flex-wrap gap-1.5" id="typeFilters">
+                                <label class="filter-chip cursor-pointer px-3 py-1.5 rounded-full border border-stone-200 bg-white text-sm font-medium text-stone-600 transition selected">
+                                    <input type="radio" name="txType" value="all" class="sr-only" checked>الكل
+                                </label>
+                                <label class="filter-chip cursor-pointer px-3 py-1.5 rounded-full border border-stone-200 bg-white text-sm font-medium text-stone-600 transition">
+                                    <input type="radio" name="txType" value="in" class="sr-only">إيراد
+                                </label>
+                                <label class="filter-chip cursor-pointer px-3 py-1.5 rounded-full border border-stone-200 bg-white text-sm font-medium text-stone-600 transition">
+                                    <input type="radio" name="txType" value="out" class="sr-only">مصروف
+                                </label>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-xs font-medium text-stone-500 block mb-1">من تاريخ</label>
+                                <input type="date" id="filterDateFrom"
+                                    class="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
+                            </div>
+                            <div>
+                                <label class="text-xs font-medium text-stone-500 block mb-1">إلى تاريخ</label>
+                                <input type="date" id="filterDateTo"
+                                    class="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-xs font-medium text-stone-500 block mb-1">بحث في الوصف</label>
+                            <input type="text" id="filterSearch" placeholder="مثال: علف، بيع..."
+                                class="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="emptyState" class="hidden text-center py-12 text-stone-400">
                 <p class="text-sm">لا توجد حركات بعد</p>
                 <p class="text-xs mt-1">ابدأ بتسجيل رصيدك الافتتاحي أو أول مصروف</p>
             </div>
-            <div id="txList" class="text-sm overflow-x-auto"></div>
+            <div id="filterEmptyState" class="hidden text-center py-12 text-stone-400">
+                <p class="text-sm">لا توجد حركات مطابقة</p>
+                <p class="text-xs mt-1">جرّب تغيير الفلاتر أو مسحها</p>
+            </div>
+            <div id="txList" class="text-sm sm:overflow-x-auto"></div>
         </section>
     </div>
 
@@ -199,6 +255,10 @@
                         حفظ
                     </button>
                 </div>
+                <button type="button" id="editDelete"
+                    class="w-full py-2.5 mt-1 rounded-lg text-red-600 text-sm font-medium hover:bg-red-50 transition">
+                    حذف الحركة
+                </button>
             </form>
         </div>
     </div>
@@ -209,6 +269,8 @@
         let entryType = 'out';
         let editType = 'out';
         let transactionsCache = [];
+        let allTransactions = [];
+        let filterPanelOpen = false;
 
         const numFmt = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
         const fmt = (n) => {
@@ -259,8 +321,9 @@
             try {
                 const res = await fetch('/api/budget/transactions');
                 const data = await res.json();
+                allTransactions = data.transactions;
                 renderSummary(data.summary);
-                renderList(data.transactions);
+                applyFiltersAndRender();
             } catch {
                 showToast('تعذر تحميل البيانات', 'error');
             }
@@ -269,61 +332,118 @@
         function renderSummary(s) {
             const bal = document.getElementById('statBalance');
             bal.textContent = fmtBalance(s.balance);
-            bal.className = `text-2xl font-bold num ${s.balance >= 0 ? 'text-amber-700' : 'text-red-600'}`;
+            bal.className = `stat-value font-bold num ${s.balance >= 0 ? 'text-amber-700' : 'text-red-600'}`;
             const income = document.getElementById('statIncome');
             income.textContent = fmtBalance(s.income_month);
-            income.className = 'text-2xl font-bold text-emerald-600 num';
+            income.className = 'stat-value font-bold text-emerald-600 num';
             const expenses = document.getElementById('statExpenses');
             expenses.textContent = fmtBalance(s.expenses_month);
-            expenses.className = 'text-2xl font-bold text-red-600 num';
+            expenses.className = 'stat-value font-bold text-red-600 num';
         }
 
-        const TX_HEADER = `
-            <table class="tx-table text-sm">
-            <thead>
-                <tr>
-                    <th class="col-date">التاريخ</th>
-                    <th class="col-desc">الوصف</th>
-                    <th class="col-amount num-col">المبلغ</th>
-                    <th class="col-balance num-col">الرصيد</th>
-                    <th class="col-actions"></th>
-                </tr>
-            </thead>
-            <tbody>`;
+        function activeFilterCount() {
+            let n = 0;
+            const type = document.querySelector('input[name="txType"]:checked')?.value;
+            if (type && type !== 'all') n++;
+            if (document.getElementById('filterDateFrom').value) n++;
+            if (document.getElementById('filterDateTo').value) n++;
+            if (document.getElementById('filterSearch').value.trim()) n++;
+            return n;
+        }
 
-        const TX_FOOTER = `</tbody></table>`;
+        function syncFilterChips() {
+            document.querySelectorAll('#typeFilters .filter-chip').forEach(label => {
+                const input = label.querySelector('input');
+                label.classList.toggle('selected', input.checked);
+            });
+        }
 
-        function renderList(transactions) {
-            transactionsCache = transactions;
-            const list = document.getElementById('txList');
-            const empty = document.getElementById('emptyState');
-            if (!transactions.length) {
-                list.innerHTML = '';
-                empty.classList.remove('hidden');
-                return;
+        function toggleFilterPanel(force) {
+            const panel = document.getElementById('filterPanel');
+            const toggle = document.getElementById('filterToggle');
+            const chevron = document.getElementById('filterChevron');
+            filterPanelOpen = typeof force === 'boolean' ? force : !filterPanelOpen;
+            panel.classList.toggle('expanded', filterPanelOpen);
+            panel.classList.toggle('max-h-0', !filterPanelOpen);
+            panel.classList.toggle('opacity-0', !filterPanelOpen);
+            panel.classList.toggle('max-h-96', filterPanelOpen);
+            panel.classList.toggle('py-4', filterPanelOpen);
+            toggle.setAttribute('aria-expanded', filterPanelOpen);
+            chevron.style.transform = filterPanelOpen ? 'rotate(180deg)' : '';
+        }
+
+        function updateFilterUI(filteredCount) {
+            const n = activeFilterCount();
+            const badge = document.getElementById('filterBadge');
+            const clearBtn = document.getElementById('clearFilters');
+            if (n > 0) {
+                badge.textContent = n;
+                badge.classList.remove('hidden');
+                clearBtn.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+                clearBtn.classList.add('hidden');
             }
-            empty.classList.add('hidden');
-            list.innerHTML = TX_HEADER + transactions.map(tx => {
-                const isIncome = tx.amount > 0;
-                const amountClass = isIncome ? 'text-emerald-600' : 'text-red-600';
-                return `
+            const total = allTransactions.length;
+            const countEl = document.getElementById('resultsCount');
+            if (!total) {
+                countEl.textContent = '';
+            } else if (n > 0) {
+                countEl.textContent = `${filteredCount} من ${total} حركة`;
+            } else {
+                countEl.textContent = `${total} حركة`;
+            }
+        }
+
+        function clearFilters() {
+            document.querySelector('input[name="txType"][value="all"]').checked = true;
+            document.getElementById('filterDateFrom').value = '';
+            document.getElementById('filterDateTo').value = '';
+            document.getElementById('filterSearch').value = '';
+            syncFilterChips();
+            applyFiltersAndRender();
+        }
+
+        function filterTransactions() {
+            const type = document.querySelector('input[name="txType"]:checked')?.value || 'all';
+            const from = document.getElementById('filterDateFrom').value;
+            const to = document.getElementById('filterDateTo').value;
+            const q = document.getElementById('filterSearch').value.trim().toLowerCase();
+            return allTransactions.filter(tx => {
+                if (type === 'in' && tx.amount <= 0) return false;
+                if (type === 'out' && tx.amount >= 0) return false;
+                if (from && tx.transaction_date < from) return false;
+                if (to && tx.transaction_date > to) return false;
+                if (q && !tx.description.toLowerCase().includes(q)) return false;
+                return true;
+            });
+        }
+
+        function applyFiltersAndRender() {
+            const filtered = filterTransactions();
+            transactionsCache = filtered;
+            updateFilterUI(filtered.length);
+            renderList(filtered);
+        }
+
+        const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+
+        function monthLabel(monthKey) {
+            const [y, m] = monthKey.split('-').map(Number);
+            const now = new Date();
+            if (y === now.getFullYear() && m === now.getMonth() + 1) return 'هذا الشهر';
+            return `${AR_MONTHS[m - 1]} ${y}`;
+        }
+
+        function renderTxRowDesktop(tx) {
+            const isIncome = tx.amount > 0;
+            const amountClass = isIncome ? 'text-emerald-600' : 'text-red-600';
+            return `
                 <tr>
-                    <td class="col-date">
-                        <span class="tx-cell-label">التاريخ</span>
-                        <span class="num text-stone-600">${fmtDate(tx.transaction_date)}</span>
-                    </td>
-                    <td class="col-desc">
-                        <span class="tx-cell-label">الوصف</span>
-                        <span class="block truncate text-stone-800">${escapeHtml(tx.description)}</span>
-                    </td>
-                    <td class="col-amount">
-                        <span class="tx-cell-label">المبلغ</span>
-                        <span class="num font-semibold ${amountClass}">${fmt(tx.amount)}</span>
-                    </td>
-                    <td class="col-balance">
-                        <span class="tx-cell-label">الرصيد</span>
-                        <span class="num font-semibold text-stone-800">${fmtBalance(tx.running_balance)}</span>
-                    </td>
+                    <td class="col-date"><span class="num text-stone-600">${fmtDate(tx.transaction_date)}</span></td>
+                    <td class="col-desc"><span class="block truncate text-stone-800">${escapeHtml(tx.description)}</span></td>
+                    <td class="col-amount"><span class="num font-semibold ${amountClass}">${fmt(tx.amount)}</span></td>
+                    <td class="col-balance"><span class="num font-semibold text-stone-800">${fmtBalance(tx.running_balance)}</span></td>
                     <td class="col-actions">
                         <div class="flex justify-end">
                             <button type="button" data-edit="${tx.id}" title="تعديل" aria-label="تعديل"
@@ -337,16 +457,98 @@
                         </div>
                     </td>
                 </tr>`;
-            }).join('') + TX_FOOTER;
+        }
+
+        function renderTxRowMobile(tx) {
+            const isIncome = tx.amount > 0;
+            const amountClass = isIncome ? 'text-emerald-600' : 'text-red-600';
+            return `
+                <div class="tx-feed-item" data-id="${tx.id}" role="button" tabindex="0">
+                    <div class="flex justify-between items-start gap-3">
+                        <span class="font-medium text-stone-900 leading-snug">${escapeHtml(tx.description)}</span>
+                        <span class="num font-semibold text-base shrink-0 ${amountClass}">${fmt(tx.amount)}</span>
+                    </div>
+                    <div class="flex justify-between items-center gap-3 mt-1 text-xs text-stone-400">
+                        <span class="num">${fmtDate(tx.transaction_date)}</span>
+                        <span class="num">رصيد ${fmtBalance(tx.running_balance)}</span>
+                    </div>
+                </div>`;
+        }
+
+        function renderMobileFeed(transactions) {
+            let html = '';
+            let lastMonth = null;
+            for (const tx of transactions) {
+                const monthKey = tx.transaction_date.slice(0, 7);
+                if (monthKey !== lastMonth) {
+                    lastMonth = monthKey;
+                    html += `<div class="tx-feed-month">${monthLabel(monthKey)}</div>`;
+                }
+                html += renderTxRowMobile(tx);
+            }
+            return html;
+        }
+
+        const TX_TABLE_HEADER = `
+            <table class="tx-table text-sm w-full">
+            <thead>
+                <tr>
+                    <th class="col-date">التاريخ</th>
+                    <th class="col-desc">الوصف</th>
+                    <th class="col-amount num-col">المبلغ</th>
+                    <th class="col-balance num-col">الرصيد</th>
+                    <th class="col-actions"></th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+        function renderList(transactions) {
+            const list = document.getElementById('txList');
+            const empty = document.getElementById('emptyState');
+            const filterEmpty = document.getElementById('filterEmptyState');
+            if (!allTransactions.length) {
+                list.innerHTML = '';
+                empty.classList.remove('hidden');
+                filterEmpty.classList.add('hidden');
+                return;
+            }
+            empty.classList.add('hidden');
+            if (!transactions.length) {
+                list.innerHTML = '';
+                filterEmpty.classList.remove('hidden');
+                return;
+            }
+            filterEmpty.classList.add('hidden');
+            const desktopRows = transactions.map(renderTxRowDesktop).join('');
+            list.innerHTML = `
+                <div class="sm:hidden">${renderMobileFeed(transactions)}</div>
+                <div class="hidden sm:block">${TX_TABLE_HEADER}${desktopRows}</tbody></table></div>`;
 
             list.querySelectorAll('[data-edit]').forEach(btn => {
-                btn.addEventListener('click', () => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
                     const tx = transactionsCache.find(t => t.id === Number(btn.dataset.edit));
                     if (tx) openEdit(tx);
                 });
             });
             list.querySelectorAll('[data-delete]').forEach(btn => {
-                btn.addEventListener('click', () => deleteTx(Number(btn.dataset.delete)));
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteTx(Number(btn.dataset.delete));
+                });
+            });
+            list.querySelectorAll('.tx-feed-item').forEach(item => {
+                const open = () => {
+                    const tx = transactionsCache.find(t => t.id === Number(item.dataset.id));
+                    if (tx) openEdit(tx);
+                };
+                item.addEventListener('click', open);
+                item.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        open();
+                    }
+                });
             });
         }
 
@@ -398,6 +600,10 @@
 
         document.getElementById('editCancel').addEventListener('click', closeEdit);
         document.getElementById('editBackdrop').addEventListener('click', closeEdit);
+        document.getElementById('editDelete').addEventListener('click', () => {
+            const id = document.getElementById('editId').value;
+            if (id) deleteTx(Number(id), true);
+        });
 
         document.getElementById('editForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -426,17 +632,32 @@
             }
         });
 
-        async function deleteTx(id) {
+        async function deleteTx(id, fromModal = false) {
             if (!confirm('حذف هذه الحركة؟')) return;
             try {
                 const res = await fetch(`/api/budget/transactions/${id}`, { method: 'DELETE' });
                 const result = await res.json();
                 showToast(result.message, result.success !== false ? 'success' : 'error');
-                if (result.success !== false) fetchTransactions();
+                if (result.success !== false) {
+                    if (fromModal) closeEdit();
+                    fetchTransactions();
+                }
             } catch {
                 showToast('تعذر الحذف', 'error');
             }
         }
+
+        document.getElementById('filterToggle').addEventListener('click', () => toggleFilterPanel());
+        document.getElementById('clearFilters').addEventListener('click', clearFilters);
+        document.getElementById('filterDateFrom').addEventListener('change', applyFiltersAndRender);
+        document.getElementById('filterDateTo').addEventListener('change', applyFiltersAndRender);
+        document.getElementById('filterSearch').addEventListener('input', applyFiltersAndRender);
+        document.querySelectorAll('#typeFilters input').forEach(input => {
+            input.addEventListener('change', () => {
+                syncFilterChips();
+                applyFiltersAndRender();
+            });
+        });
 
         fetchTransactions();
     </script>
