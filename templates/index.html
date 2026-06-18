@@ -89,20 +89,54 @@
                             <div id="genderFilters" class="flex flex-wrap gap-1.5"></div>
                         </div>
                     </div>
-                    <div>
-                        <span class="text-xs font-medium text-stone-500 mb-2 block">العمر</span>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <input type="number" id="ageFilterMin" min="0" step="1" placeholder="من"
-                                class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
-                            <span class="text-stone-400 text-xs">—</span>
-                            <input type="number" id="ageFilterMax" min="0" step="1" placeholder="إلى"
-                                class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
-                            <select id="ageFilterUnit"
-                                class="bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
-                                <option value="days">يوم</option>
-                                <option value="months">شهر</option>
-                                <option value="years">سنة</option>
-                            </select>
+                    <div class="space-y-4">
+                        <div>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">وقت من الولادة</span>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <input type="number" id="ageFilterMin" min="0" step="1" placeholder="من"
+                                    class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
+                                <span class="text-stone-400 text-xs">—</span>
+                                <input type="number" id="ageFilterMax" min="0" step="1" placeholder="إلى"
+                                    class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
+                                <select id="ageFilterUnit"
+                                    class="bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
+                                    <option value="days">يوم</option>
+                                    <option value="months">شهر</option>
+                                    <option value="years">سنة</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">وقت من آخر تلقيح</span>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <input type="number" id="matingSinceMin" min="0" step="1" placeholder="من"
+                                    class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
+                                <span class="text-stone-400 text-xs">—</span>
+                                <input type="number" id="matingSinceMax" min="0" step="1" placeholder="إلى"
+                                    class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
+                                <select id="matingSinceUnit"
+                                    class="bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
+                                    <option value="days">يوم</option>
+                                    <option value="months">شهر</option>
+                                    <option value="years">سنة</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">وقت من آخر سونار</span>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <input type="number" id="sonarSinceMin" min="0" step="1" placeholder="من"
+                                    class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
+                                <span class="text-stone-400 text-xs">—</span>
+                                <input type="number" id="sonarSinceMax" min="0" step="1" placeholder="إلى"
+                                    class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
+                                <select id="sonarSinceUnit"
+                                    class="bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
+                                    <option value="days">يوم</option>
+                                    <option value="months">شهر</option>
+                                    <option value="years">سنة</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div class="pb-4">
@@ -580,64 +614,64 @@
             renderFilterGroup('genderFilters', GENDER_FILTER_OPTIONS, activeGenderFilter, 'data-gender');
         }
 
-        function getAgeFilterValues() {
+        function getDurationFilterValues(minId, maxId, unitId) {
             return {
-                minRaw: document.getElementById('ageFilterMin').value.trim(),
-                maxRaw: document.getElementById('ageFilterMax').value.trim(),
-                unit: document.getElementById('ageFilterUnit').value,
+                minRaw: document.getElementById(minId).value.trim(),
+                maxRaw: document.getElementById(maxId).value.trim(),
+                unit: document.getElementById(unitId).value,
             };
         }
 
-        function hasAgeFilter() {
-            const { minRaw, maxRaw } = getAgeFilterValues();
-            return minRaw !== '' || maxRaw !== '';
+        function hasDurationFilter(minId, maxId) {
+            return document.getElementById(minId).value.trim() !== '' || document.getElementById(maxId).value.trim() !== '';
         }
 
-        function getAgeFilterNormalizedBounds() {
-            const { minRaw, maxRaw, unit } = getAgeFilterValues();
+        function getDurationFilterBounds(minId, maxId, unitId) {
+            const { minRaw, maxRaw, unit } = getDurationFilterValues(minId, maxId, unitId);
             let min = minRaw !== '' ? Number(minRaw) : null;
             let max = maxRaw !== '' ? Number(maxRaw) : null;
             if (min !== null && max !== null && min > max) [min, max] = [max, min];
             return { min, max, unit };
         }
 
-        function getAgeFilterSummaryLabel() {
-            const { minRaw, maxRaw, unit } = getAgeFilterValues();
+        function formatDurationUnitLabel(n, unit) {
+            const num = Number(n);
+            if (unit === 'years') return num === 1 ? 'سنة' : 'سنوات';
+            if (unit === 'months') return num === 1 ? 'شهر' : 'أشهر';
+            if (num === 0) return 'اليوم';
+            if (num === 1) return 'يوم';
+            if (num === 2) return 'يومان';
+            if (num <= 10) return 'أيام';
+            return 'يوماً';
+        }
+
+        function getDurationFilterSummaryLabel(minId, maxId, unitId, prefix) {
+            const { minRaw, maxRaw, unit } = getDurationFilterValues(minId, maxId, unitId);
             if (!minRaw && !maxRaw) return null;
-            const unitFor = (n) => {
-                const num = Number(n);
-                if (unit === 'years') return num === 1 ? 'سنة' : 'سنوات';
-                if (unit === 'months') return num === 1 ? 'شهر' : 'أشهر';
-                if (num === 0) return 'اليوم';
-                if (num === 1) return 'يوم';
-                if (num === 2) return 'يومان';
-                if (num <= 10) return 'أيام';
-                return 'يوماً';
-            };
-            if (minRaw && maxRaw) return `${minRaw}–${maxRaw} ${unitFor(maxRaw)}`;
-            if (minRaw) return `من ${minRaw} ${unitFor(minRaw)}`;
-            return `حتى ${maxRaw} ${unitFor(maxRaw)}`;
+            if (minRaw && maxRaw) return `${prefix}: ${minRaw}–${maxRaw} ${formatDurationUnitLabel(maxRaw, unit)}`;
+            if (minRaw) return `${prefix}: من ${minRaw} ${formatDurationUnitLabel(minRaw, unit)}`;
+            return `${prefix}: حتى ${maxRaw} ${formatDurationUnitLabel(maxRaw, unit)}`;
         }
 
-        function getAgeDays(birthDate) {
-            if (!birthDate) return null;
-            const birth = new Date(`${birthDate}T00:00:00`);
+        function getDaysSince(dateStr) {
+            if (!dateStr) return null;
+            const d = new Date(`${dateStr}T00:00:00`);
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            if (Number.isNaN(birth.getTime()) || birth > today) return null;
-            return Math.floor((today - birth) / (1000 * 60 * 60 * 24));
+            if (Number.isNaN(d.getTime()) || d > today) return null;
+            return Math.floor((today - d) / (1000 * 60 * 60 * 24));
         }
 
-        function getAgeMonths(birthDate) {
-            if (!birthDate) return null;
-            const birth = new Date(`${birthDate}T00:00:00`);
+        function getMonthsSince(dateStr) {
+            if (!dateStr) return null;
+            const d = new Date(`${dateStr}T00:00:00`);
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            if (Number.isNaN(birth.getTime()) || birth > today) return null;
+            if (Number.isNaN(d.getTime()) || d > today) return null;
 
-            let years = today.getFullYear() - birth.getFullYear();
-            let months = today.getMonth() - birth.getMonth();
-            const days = today.getDate() - birth.getDate();
+            let years = today.getFullYear() - d.getFullYear();
+            let months = today.getMonth() - d.getMonth();
+            const days = today.getDate() - d.getDate();
             if (days < 0) months -= 1;
             if (months < 0) {
                 years -= 1;
@@ -646,19 +680,19 @@
             return years * 12 + months;
         }
 
-        function matchesAgeFilter(sheep) {
-            if (!hasAgeFilter()) return true;
-            const { min, max, unit } = getAgeFilterNormalizedBounds();
+        function matchesDurationSinceFilter(dateStr, minId, maxId, unitId) {
+            if (!hasDurationFilter(minId, maxId)) return true;
+            const { min, max, unit } = getDurationFilterBounds(minId, maxId, unitId);
 
             if (unit === 'days') {
-                const days = getAgeDays(sheep.birth_date);
+                const days = getDaysSince(dateStr);
                 if (days === null) return false;
                 if (min !== null && days < min) return false;
                 if (max !== null && days > max) return false;
                 return true;
             }
 
-            const months = getAgeMonths(sheep.birth_date);
+            const months = getMonthsSince(dateStr);
             if (months === null) return false;
             const multiplier = unit === 'years' ? 12 : 1;
             const minBound = min !== null ? min * multiplier : null;
@@ -668,8 +702,73 @@
             return true;
         }
 
+        function getLatestMatingDate(sheep) {
+            const matings = sheep.matings || [];
+            if (!matings.length) return null;
+            return matings.reduce((latest, m) => {
+                if (!m.mated_date) return latest;
+                return !latest || m.mated_date > latest ? m.mated_date : latest;
+            }, null);
+        }
+
+        function getLatestSonarDate(sheep) {
+            const matings = sheep.matings || [];
+            let latest = null;
+            for (const m of matings) {
+                for (const u of (m.ultrasounds || [])) {
+                    if (!u.scan_date) continue;
+                    if (!latest || u.scan_date > latest) latest = u.scan_date;
+                }
+            }
+            return latest;
+        }
+
+        function getAgeFilterValues() {
+            return getDurationFilterValues('ageFilterMin', 'ageFilterMax', 'ageFilterUnit');
+        }
+
+        function hasAgeFilter() {
+            return hasDurationFilter('ageFilterMin', 'ageFilterMax');
+        }
+
+        function hasMatingSinceFilter() {
+            return hasDurationFilter('matingSinceMin', 'matingSinceMax');
+        }
+
+        function hasSonarSinceFilter() {
+            return hasDurationFilter('sonarSinceMin', 'sonarSinceMax');
+        }
+
+        function getAgeFilterNormalizedBounds() {
+            return getDurationFilterBounds('ageFilterMin', 'ageFilterMax', 'ageFilterUnit');
+        }
+
+        function getAgeFilterSummaryLabel() {
+            return getDurationFilterSummaryLabel('ageFilterMin', 'ageFilterMax', 'ageFilterUnit', 'وقت من الولادة');
+        }
+
+        function getAgeDays(birthDate) {
+            return getDaysSince(birthDate);
+        }
+
+        function getAgeMonths(birthDate) {
+            return getMonthsSince(birthDate);
+        }
+
+        function matchesAgeFilter(sheep) {
+            return matchesDurationSinceFilter(sheep.birth_date, 'ageFilterMin', 'ageFilterMax', 'ageFilterUnit');
+        }
+
+        function matchesMatingSinceFilter(sheep) {
+            return matchesDurationSinceFilter(getLatestMatingDate(sheep), 'matingSinceMin', 'matingSinceMax', 'matingSinceUnit');
+        }
+
+        function matchesSonarSinceFilter(sheep) {
+            return matchesDurationSinceFilter(getLatestSonarDate(sheep), 'sonarSinceMin', 'sonarSinceMax', 'sonarSinceUnit');
+        }
+
         function hasActiveFilters() {
-            return !!(activeBreedFilter || activeLifeFilter || activeMotherFilter || activeGenderFilter || activePregnancyFilter || hasAgeFilter() || document.getElementById('searchBar').value.trim());
+            return !!(activeBreedFilter || activeLifeFilter || activeMotherFilter || activeGenderFilter || activePregnancyFilter || hasAgeFilter() || hasMatingSinceFilter() || hasSonarSinceFilter() || document.getElementById('searchBar').value.trim());
         }
 
         function getActiveFilterSummary() {
@@ -680,6 +779,10 @@
             if (activeGenderFilter) parts.push(activeGenderFilter);
             const ageLabel = getAgeFilterSummaryLabel();
             if (ageLabel) parts.push(ageLabel);
+            const matingSinceLabel = getDurationFilterSummaryLabel('matingSinceMin', 'matingSinceMax', 'matingSinceUnit', 'وقت من آخر تلقيح');
+            if (matingSinceLabel) parts.push(matingSinceLabel);
+            const sonarSinceLabel = getDurationFilterSummaryLabel('sonarSinceMin', 'sonarSinceMax', 'sonarSinceUnit', 'وقت من آخر سونار');
+            if (sonarSinceLabel) parts.push(sonarSinceLabel);
             if (activeBreedFilter) parts.push(activeBreedFilter);
             return parts;
         }
@@ -711,6 +814,12 @@
             document.getElementById('ageFilterMin').value = '';
             document.getElementById('ageFilterMax').value = '';
             document.getElementById('ageFilterUnit').value = 'months';
+            document.getElementById('matingSinceMin').value = '';
+            document.getElementById('matingSinceMax').value = '';
+            document.getElementById('matingSinceUnit').value = 'days';
+            document.getElementById('sonarSinceMin').value = '';
+            document.getElementById('sonarSinceMax').value = '';
+            document.getElementById('sonarSinceUnit').value = 'days';
             renderLifeFilters();
             renderPregnancyFilters();
             renderMotherFilters();
@@ -727,7 +836,7 @@
             panel.classList.toggle('expanded', filtersExpanded);
             panel.classList.toggle('max-h-0', !filtersExpanded);
             panel.classList.toggle('opacity-0', !filtersExpanded);
-            panel.classList.toggle('max-h-[580px]', filtersExpanded);
+            panel.classList.toggle('max-h-[680px]', filtersExpanded);
             panel.classList.toggle('opacity-100', filtersExpanded);
             chevron.classList.toggle('rotate-180', filtersExpanded);
             toggle.setAttribute('aria-expanded', filtersExpanded ? 'true' : 'false');
@@ -884,6 +993,12 @@
             }
             if (hasAgeFilter()) {
                 filtered = filtered.filter(s => matchesAgeFilter(s));
+            }
+            if (hasMatingSinceFilter()) {
+                filtered = filtered.filter(s => matchesMatingSinceFilter(s));
+            }
+            if (hasSonarSinceFilter()) {
+                filtered = filtered.filter(s => matchesSonarSinceFilter(s));
             }
             if (query) {
                 filtered = filtered.filter(s => s.tag_id.toLowerCase().includes(query));
@@ -1273,7 +1388,7 @@
             if (chip) setPregnancyFilter(chip.getAttribute('data-pregnancy') || '');
         });
 
-        ['ageFilterMin', 'ageFilterMax', 'ageFilterUnit'].forEach(id => {
+        ['ageFilterMin', 'ageFilterMax', 'ageFilterUnit', 'matingSinceMin', 'matingSinceMax', 'matingSinceUnit', 'sonarSinceMin', 'sonarSinceMax', 'sonarSinceUnit'].forEach(id => {
             document.getElementById(id).addEventListener('input', applyFilters);
             document.getElementById(id).addEventListener('change', applyFilters);
         });
