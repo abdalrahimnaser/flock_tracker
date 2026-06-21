@@ -39,7 +39,15 @@
         }
         .tx-table tbody tr:last-child td { border-bottom: none; }
         .tx-table .col-date { width: 6.5rem; white-space: nowrap; }
-        .tx-table .col-desc { min-width: 8rem; }
+        .tx-table .col-desc {
+            width: auto;
+            min-width: 10rem;
+            text-align: left;
+            white-space: normal;
+            word-break: break-word;
+            line-height: 1.45;
+        }
+        .tx-table thead th.col-desc { text-align: left; }
         .tx-table .col-amount { width: 8.75rem; min-width: 8.75rem; text-align: left; }
         .tx-table .col-balance { width: 8.75rem; min-width: 8.75rem; text-align: left; }
         .tx-table .col-actions { width: 4.5rem; padding-left: 0.25rem; padding-right: 0.25rem; }
@@ -70,6 +78,10 @@
         .filter-panel { transition: max-height 0.25s ease, opacity 0.2s ease, padding 0.25s ease; }
         .filter-panel:not(.expanded) { padding-top: 0; padding-bottom: 0; border-width: 0; }
         .filter-chip.selected { background: #d97706; color: white; border-color: #d97706; }
+        .category-chip.selected { background: #d97706; color: white; border-color: #d97706; }
+        .category-badge { font-size: 0.6875rem; font-weight: 600; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #fef3c7; color: #92400e; }
+        .category-badge.uncategorized { background: #f5f5f4; color: #78716c; }
+        .tx-table .col-category { width: 5.5rem; white-space: nowrap; }
     </style>
 </head>
 <body class="text-stone-800 min-h-screen font-sans relative pb-24">
@@ -131,9 +143,21 @@
                             class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
                     </div>
                 </div>
+                <div id="addCategoryWrap" class="space-y-2">
+                    <label class="text-xs font-medium text-stone-500 block">فئة المصروف *</label>
+                    <div id="addCategoryChips" class="flex flex-wrap gap-1.5"></div>
+                    <div class="flex gap-2">
+                        <input type="text" id="newCategoryName" placeholder="فئة جديدة..."
+                            class="flex-1 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
+                        <button type="button" id="addCategoryBtn"
+                            class="shrink-0 px-3 py-2 rounded-lg border border-stone-200 bg-white text-sm font-medium text-stone-700 hover:bg-stone-50 transition">
+                            + إضافة
+                        </button>
+                    </div>
+                </div>
                 <div>
-                    <label class="text-xs font-medium text-stone-500 block mb-1">الوصف</label>
-                    <input type="text" id="description" required placeholder="مثال: علف، بيع خروف، إصلاح سياج..."
+                    <label class="text-xs font-medium text-stone-500 block mb-1">الوصف <span class="text-stone-400 font-normal">(اختياري)</span></label>
+                    <input type="text" id="description" placeholder="مثال: علف شعير، فحص بيطري، إصلاح سياج..."
                         class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
                 </div>
                 <button type="submit"
@@ -147,6 +171,31 @@
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <h2 class="text-lg font-bold">سجل الحركات</h2>
                 <p id="resultsCount" class="text-xs text-stone-500"></p>
+            </div>
+
+            <div id="filterSummary" class="hidden mb-4 rounded-xl border border-amber-200 bg-amber-50/80 p-4">
+                <div class="flex items-center justify-between gap-2 mb-3">
+                    <h3 class="text-sm font-bold text-amber-900">ملخص النتائج المفلترة</h3>
+                    <span id="filterSummaryLabel" class="text-xs text-amber-800/80"></span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                    <div class="bg-white/70 rounded-lg p-2.5 border border-amber-100">
+                        <div id="fsExpenses" class="num font-bold text-red-600 text-sm sm:text-base">—</div>
+                        <div class="text-[11px] text-stone-500 mt-0.5">مصروفات</div>
+                    </div>
+                    <div class="bg-white/70 rounded-lg p-2.5 border border-amber-100">
+                        <div id="fsIncome" class="num font-bold text-emerald-600 text-sm sm:text-base">—</div>
+                        <div class="text-[11px] text-stone-500 mt-0.5">إيرادات</div>
+                    </div>
+                    <div class="bg-white/70 rounded-lg p-2.5 border border-amber-100">
+                        <div id="fsNet" class="num font-bold text-amber-800 text-sm sm:text-base">—</div>
+                        <div class="text-[11px] text-stone-500 mt-0.5">صافي</div>
+                    </div>
+                    <div class="bg-white/70 rounded-lg p-2.5 border border-amber-100">
+                        <div id="fsCount" class="num font-bold text-stone-800 text-sm sm:text-base">—</div>
+                        <div class="text-[11px] text-stone-500 mt-0.5">عدد الحركات</div>
+                    </div>
+                </div>
             </div>
 
             <div class="mb-4 space-y-3">
@@ -192,6 +241,10 @@
                                 <input type="date" id="filterDateTo"
                                     class="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
                             </div>
+                        </div>
+                        <div>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">فئة المصروف</span>
+                            <div id="categoryFilters" class="flex flex-wrap gap-1.5"></div>
                         </div>
                         <div>
                             <label class="text-xs font-medium text-stone-500 block mb-1">بحث في الوصف</label>
@@ -240,9 +293,13 @@
                     <input type="date" id="editDate" required
                         class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
                 </div>
+                <div id="editCategoryWrap" class="space-y-2 hidden">
+                    <label class="text-xs font-medium text-stone-500 block">فئة المصروف *</label>
+                    <div id="editCategoryChips" class="flex flex-wrap gap-1.5"></div>
+                </div>
                 <div>
-                    <label class="text-xs font-medium text-stone-500 block mb-1">الوصف</label>
-                    <input type="text" id="editDescription" required
+                    <label class="text-xs font-medium text-stone-500 block mb-1">الوصف <span class="text-stone-400 font-normal">(اختياري)</span></label>
+                    <input type="text" id="editDescription"
                         class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
                 </div>
                 <div class="flex gap-2 pt-2">
@@ -270,7 +327,11 @@
         let editType = 'out';
         let transactionsCache = [];
         let allTransactions = [];
+        let categories = [];
         let filterPanelOpen = false;
+        let selectedAddCategoryId = null;
+        let selectedEditCategoryId = null;
+        let activeCategoryFilter = '';
 
         const numFmt = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
 
@@ -335,10 +396,111 @@
                 editType = type;
                 document.getElementById('editBtnIncome').classList.toggle('selected-in', type === 'in');
                 document.getElementById('editBtnExpense').classList.toggle('selected-out', type === 'out');
+                document.getElementById('editCategoryWrap').classList.toggle('hidden', type === 'in');
             } else {
                 entryType = type;
                 document.getElementById('btnIncome').classList.toggle('selected-in', type === 'in');
                 document.getElementById('btnExpense').classList.toggle('selected-out', type === 'out');
+                document.getElementById('addCategoryWrap').classList.toggle('hidden', type === 'in');
+            }
+        }
+
+        function categoryChipClass(active) {
+            return active
+                ? 'category-chip selected px-3 py-1.5 rounded-full border text-sm font-medium transition'
+                : 'category-chip px-3 py-1.5 rounded-full border border-stone-200 bg-white text-sm font-medium text-stone-600 transition hover:border-stone-300 hover:bg-stone-50';
+        }
+
+        function renderCategoryPicker(containerId, selectedId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.innerHTML = categories.map(cat => `
+                <button type="button" data-category-id="${cat.id}" class="${categoryChipClass(String(selectedId) === String(cat.id))}">${escapeHtml(cat.name)}</button>
+            `).join('');
+        }
+
+        function renderCategoryFilters() {
+            const container = document.getElementById('categoryFilters');
+            if (!container) return;
+            let html = `<button type="button" data-category-filter="" class="${categoryChipClass(!activeCategoryFilter)}">الكل</button>`;
+            html += `<button type="button" data-category-filter="uncategorized" class="${categoryChipClass(activeCategoryFilter === 'uncategorized')}">غير مصنّف</button>`;
+            html += categories.map(cat => `
+                <button type="button" data-category-filter="${cat.id}" class="${categoryChipClass(String(activeCategoryFilter) === String(cat.id))}">${escapeHtml(cat.name)}</button>
+            `).join('');
+            const custom = categories.filter(c => !c.is_system);
+            if (custom.length) {
+                html += `<div class="w-full basis-full mt-2 pt-2 border-t border-stone-200/80"><span class="text-[11px] text-stone-400 block mb-1.5">فئات مخصصة — اضغط × للحذف</span><div class="flex flex-wrap gap-1.5">`;
+                html += custom.map(cat => `
+                    <span class="inline-flex items-center gap-1 pl-1 pr-2 py-1 rounded-full border border-stone-200 bg-white text-xs text-stone-600">
+                        ${escapeHtml(cat.name)}
+                        <button type="button" data-delete-category="${cat.id}" class="w-5 h-5 rounded-full text-stone-400 hover:text-red-600 hover:bg-red-50 transition" title="حذف">×</button>
+                    </span>
+                `).join('');
+                html += '</div></div>';
+            }
+            container.innerHTML = html;
+        }
+
+        function setAddCategory(id) {
+            selectedAddCategoryId = id;
+            renderCategoryPicker('addCategoryChips', id);
+        }
+
+        function setEditCategory(id) {
+            selectedEditCategoryId = id;
+            renderCategoryPicker('editCategoryChips', id);
+        }
+
+        function defaultCategoryId() {
+            const other = categories.find(c => c.name === 'أخرى');
+            return other ? other.id : (categories[0]?.id ?? null);
+        }
+
+        function categoryBadgeHtml(tx) {
+            if (tx.amount >= 0) return '';
+            const label = tx.category_name || 'غير مصنّف';
+            const cls = tx.category_name ? 'category-badge' : 'category-badge uncategorized';
+            return `<span class="${cls}">${escapeHtml(label)}</span>`;
+        }
+
+        async function addCustomCategory() {
+            const name = document.getElementById('newCategoryName').value.trim();
+            if (!name) {
+                showToast('أدخل اسم الفئة', 'error');
+                return;
+            }
+            try {
+                const res = await fetch('/api/budget/categories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name }),
+                });
+                const result = await res.json();
+                showToast(result.message, result.success !== false ? 'success' : 'error');
+                if (result.success !== false) {
+                    document.getElementById('newCategoryName').value = '';
+                    await fetchTransactions();
+                    setAddCategory(result.id);
+                }
+            } catch {
+                showToast('تعذر إضافة الفئة', 'error');
+            }
+        }
+
+        async function deleteCustomCategory(id) {
+            if (!confirm('حذف هذه الفئة؟')) return;
+            try {
+                const res = await fetch(`/api/budget/categories/${id}`, { method: 'DELETE' });
+                const result = await res.json();
+                showToast(result.message, result.success !== false ? 'success' : 'error');
+                if (result.success !== false) {
+                    if (String(activeCategoryFilter) === String(id)) activeCategoryFilter = '';
+                    if (String(selectedAddCategoryId) === String(id)) setAddCategory(defaultCategoryId());
+                    if (String(selectedEditCategoryId) === String(id)) setEditCategory(defaultCategoryId());
+                    fetchTransactions();
+                }
+            } catch {
+                showToast('تعذر الحذف', 'error');
             }
         }
 
@@ -346,6 +508,7 @@
         document.getElementById('btnExpense').addEventListener('click', () => setType('out'));
         document.getElementById('editBtnIncome').addEventListener('click', () => setType('in', true));
         document.getElementById('editBtnExpense').addEventListener('click', () => setType('out', true));
+        setType('out');
 
         document.getElementById('transactionDate').value = new Date().toISOString().slice(0, 10);
 
@@ -353,8 +516,12 @@
             try {
                 const res = await fetch('/api/budget/transactions');
                 const data = await res.json();
+                categories = data.categories || [];
                 allTransactions = data.transactions;
                 renderSummary(data.summary);
+                if (!selectedAddCategoryId) setAddCategory(defaultCategoryId());
+                else renderCategoryPicker('addCategoryChips', selectedAddCategoryId);
+                renderCategoryFilters();
                 applyFiltersAndRender();
             } catch {
                 showToast('تعذر تحميل البيانات', 'error');
@@ -380,7 +547,53 @@
             if (document.getElementById('filterDateFrom').value) n++;
             if (document.getElementById('filterDateTo').value) n++;
             if (document.getElementById('filterSearch').value.trim()) n++;
+            if (activeCategoryFilter) n++;
             return n;
+        }
+
+        function filterSummaryParts() {
+            const parts = [];
+            const type = document.querySelector('input[name="txType"]:checked')?.value;
+            if (type === 'in') parts.push('إيرادات');
+            else if (type === 'out') parts.push('مصروفات');
+            if (activeCategoryFilter === 'uncategorized') parts.push('غير مصنّف');
+            else if (activeCategoryFilter) {
+                const cat = categories.find(c => String(c.id) === String(activeCategoryFilter));
+                if (cat) parts.push(cat.name);
+            }
+            const from = document.getElementById('filterDateFrom').value;
+            const to = document.getElementById('filterDateTo').value;
+            if (from || to) parts.push(from && to ? `${from} → ${to}` : from ? `من ${from}` : `حتى ${to}`);
+            const q = document.getElementById('filterSearch').value.trim();
+            if (q) parts.push(`"${q}"`);
+            return parts;
+        }
+
+        function renderFilterSummary(filtered) {
+            const panel = document.getElementById('filterSummary');
+            const n = activeFilterCount();
+            if (!n || !allTransactions.length) {
+                panel.classList.add('hidden');
+                return;
+            }
+            panel.classList.remove('hidden');
+            const parts = filterSummaryParts();
+            document.getElementById('filterSummaryLabel').textContent = parts.length ? parts.join(' · ') : '';
+
+            let income = 0;
+            let expenses = 0;
+            filtered.forEach(tx => {
+                if (tx.amount > 0) income += tx.amount;
+                else expenses += Math.abs(tx.amount);
+            });
+            const net = income - expenses;
+
+            document.getElementById('fsExpenses').textContent = fmtBalance(expenses);
+            document.getElementById('fsIncome').textContent = fmtBalance(income);
+            const netEl = document.getElementById('fsNet');
+            netEl.textContent = (net >= 0 ? '+' : '') + fmtBalance(net);
+            netEl.className = `num font-bold text-sm sm:text-base ${net >= 0 ? 'text-emerald-600' : 'text-red-600'}`;
+            document.getElementById('fsCount').textContent = String(filtered.length);
         }
 
         function syncFilterChips() {
@@ -432,7 +645,9 @@
             document.getElementById('filterDateFrom').value = '';
             document.getElementById('filterDateTo').value = '';
             document.getElementById('filterSearch').value = '';
+            activeCategoryFilter = '';
             syncFilterChips();
+            renderCategoryFilters();
             applyFiltersAndRender();
         }
 
@@ -446,7 +661,12 @@
                 if (type === 'out' && tx.amount >= 0) return false;
                 if (from && tx.transaction_date < from) return false;
                 if (to && tx.transaction_date > to) return false;
-                if (q && !tx.description.toLowerCase().includes(q)) return false;
+                if (q && !(tx.description || '').toLowerCase().includes(q)) return false;
+                if (activeCategoryFilter === 'uncategorized') {
+                    if (tx.amount >= 0 || tx.category_id) return false;
+                } else if (activeCategoryFilter) {
+                    if (String(tx.category_id) !== String(activeCategoryFilter)) return false;
+                }
                 return true;
             });
         }
@@ -455,6 +675,7 @@
             const filtered = filterTransactions();
             transactionsCache = filtered;
             updateFilterUI(filtered.length);
+            renderFilterSummary(filtered);
             renderList(filtered);
         }
 
@@ -467,15 +688,24 @@
             return `${AR_MONTHS[m - 1]} ${y}`;
         }
 
+        function descriptionLabel(text) {
+            const value = (text || '').trim();
+            return value ? escapeHtml(value) : '<span class="text-stone-400">—</span>';
+        }
+
         function renderTxRowDesktop(tx) {
             const isIncome = tx.amount > 0;
             const amountClass = isIncome ? 'text-emerald-600' : 'text-red-600';
+            const categoryCell = isIncome
+                ? '<td class="col-category"></td>'
+                : `<td class="col-category">${categoryBadgeHtml(tx)}</td>`;
             return `
                 <tr>
                     <td class="col-date"><span class="num text-stone-600">${fmtDate(tx.transaction_date)}</span></td>
-                    <td class="col-desc"><span class="block truncate text-stone-800">${escapeHtml(tx.description)}</span></td>
+                    ${categoryCell}
                     <td class="col-amount"><span class="num font-semibold ${amountClass}">${fmt(tx.amount)}</span></td>
                     <td class="col-balance"><span class="num font-semibold text-stone-800">${fmtBalance(tx.running_balance)}</span></td>
+                    <td class="col-desc"><span class="block text-stone-800">${descriptionLabel(tx.description)}</span></td>
                     <td class="col-actions">
                         <div class="flex justify-end">
                             <button type="button" data-edit="${tx.id}" title="تعديل" aria-label="تعديل"
@@ -494,11 +724,15 @@
         function renderTxRowMobile(tx) {
             const isIncome = tx.amount > 0;
             const amountClass = isIncome ? 'text-emerald-600' : 'text-red-600';
+            const badge = categoryBadgeHtml(tx);
             return `
                 <div class="tx-feed-item" data-id="${tx.id}" role="button" tabindex="0">
                     <div class="flex justify-between items-start gap-3">
-                        <span class="font-medium text-stone-900 leading-snug">${escapeHtml(tx.description)}</span>
                         <span class="num font-semibold text-base shrink-0 ${amountClass}">${fmt(tx.amount)}</span>
+                        <div class="min-w-0 flex-1 text-left">
+                            <div class="font-medium text-stone-900 leading-snug break-words">${descriptionLabel(tx.description)}</div>
+                            ${badge ? `<div class="mt-1">${badge}</div>` : ''}
+                        </div>
                     </div>
                     <div class="flex justify-between items-center gap-3 mt-1 text-xs text-stone-400">
                         <span class="num">${fmtDate(tx.transaction_date)}</span>
@@ -526,9 +760,10 @@
             <thead>
                 <tr>
                     <th class="col-date">التاريخ</th>
-                    <th class="col-desc">الوصف</th>
+                    <th class="col-category">الفئة</th>
                     <th class="col-amount num-col">المبلغ</th>
                     <th class="col-balance num-col">الرصيد</th>
+                    <th class="col-desc">الوصف</th>
                     <th class="col-actions"></th>
                 </tr>
             </thead>
@@ -599,6 +834,13 @@
                 transaction_date: document.getElementById('transactionDate').value,
                 description: document.getElementById('description').value.trim(),
             };
+            if (entryType === 'out') {
+                if (!selectedAddCategoryId) {
+                    showToast('الرجاء اختيار فئة المصروف', 'error');
+                    return;
+                }
+                payload.category_id = selectedAddCategoryId;
+            }
             try {
                 const res = await fetch('/api/budget/transactions', {
                     method: 'POST',
@@ -623,6 +865,7 @@
             document.getElementById('editDate').value = tx.transaction_date;
             document.getElementById('editDescription').value = tx.description;
             setType(tx.amount >= 0 ? 'in' : 'out', true);
+            setEditCategory(tx.category_id || defaultCategoryId());
             document.getElementById('editModal').classList.remove('hidden');
         }
 
@@ -647,6 +890,15 @@
                 transaction_date: document.getElementById('editDate').value,
                 description: document.getElementById('editDescription').value.trim(),
             };
+            if (editType === 'out') {
+                if (!selectedEditCategoryId) {
+                    showToast('الرجاء اختيار فئة المصروف', 'error');
+                    return;
+                }
+                payload.category_id = selectedEditCategoryId;
+            } else {
+                payload.category_id = null;
+            }
             try {
                 const res = await fetch(`/api/budget/transactions/${id}`, {
                     method: 'PUT',
@@ -678,6 +930,34 @@
                 showToast('تعذر الحذف', 'error');
             }
         }
+
+        document.getElementById('addCategoryBtn').addEventListener('click', addCustomCategory);
+        document.getElementById('newCategoryName').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addCustomCategory();
+            }
+        });
+        document.getElementById('addCategoryChips').addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-category-id]');
+            if (btn) setAddCategory(Number(btn.dataset.categoryId));
+        });
+        document.getElementById('editCategoryChips').addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-category-id]');
+            if (btn) setEditCategory(Number(btn.dataset.categoryId));
+        });
+        document.getElementById('categoryFilters').addEventListener('click', (e) => {
+            const delBtn = e.target.closest('[data-delete-category]');
+            if (delBtn) {
+                deleteCustomCategory(Number(delBtn.dataset.deleteCategory));
+                return;
+            }
+            const chip = e.target.closest('[data-category-filter]');
+            if (!chip) return;
+            activeCategoryFilter = chip.getAttribute('data-category-filter') ?? '';
+            renderCategoryFilters();
+            applyFiltersAndRender();
+        });
 
         document.getElementById('filterToggle').addEventListener('click', () => toggleFilterPanel());
         document.getElementById('clearFilters').addEventListener('click', clearFilters);

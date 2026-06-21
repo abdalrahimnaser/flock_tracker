@@ -112,14 +112,29 @@ def init_db():
         "DELETE FROM matings WHERE sheep_tag_id NOT IN (SELECT tag_id FROM sheep)"
     )
     cursor.execute('''
+        CREATE TABLE IF NOT EXISTS budget_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            is_system INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        )
+    ''')
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS budget_transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             transaction_date TEXT NOT NULL,
             amount REAL NOT NULL,
             description TEXT,
-            created_at TEXT NOT NULL
+            category_id INTEGER,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (category_id) REFERENCES budget_categories(id) ON DELETE SET NULL
         )
     ''')
+    cursor.execute("PRAGMA table_info(budget_transactions)")
+    budget_columns = {row[1] for row in cursor.fetchall()}
+    if 'category_id' not in budget_columns:
+        cursor.execute("ALTER TABLE budget_transactions ADD COLUMN category_id INTEGER REFERENCES budget_categories(id) ON DELETE SET NULL")
+    seed_budget_categories(cursor)
     conn.commit()
     conn.close()
 
@@ -886,13 +901,56 @@ def parse_amount(value):
         return 'invalid'
     return amount
 
+DEFAULT_BUDGET_CATEGORIES = ('علف', 'طبي', 'صيانة', 'أخرى')
+
+def seed_budget_categories(cursor):
+    cursor.execute("SELECT COUNT(*) FROM budget_categories")
+    if cursor.fetchone()[0] > 0:
+        return
+    for name in DEFAULT_BUDGET_CATEGORIES:
+        cursor.execute(
+            "INSERT OR IGNORE INTO budget_categories (name, is_system, created_at) VALUES (?, 1, ?)",
+            (name, now_iso()),
+        )
+
+def fetch_budget_categories(cursor):
+    cursor.execute(
+        "SELECT id, name, is_system FROM budget_categories ORDER BY is_system DESC, name COLLATE NOCASE ASC"
+    )
+    return [
+        {"id": row[0], "name": row[1], "is_system": bool(row[2])}
+        for row in cursor.fetchall()
+    ]
+
+def get_category_or_404(cursor, category_id):
+    cursor.execute(
+        "SELECT id, name, is_system FROM budget_categories WHERE id = ?",
+        (category_id,),
+    )
+    return cursor.fetchone()
+
+def resolve_expense_category_id(cursor, category_id_raw, amount):
+    if amount >= 0:
+        return None, None
+    if category_id_raw in (None, ''):
+        return None, 'الرجاء اختيار فئة المصروف.'
+    try:
+        category_id = int(category_id_raw)
+    except (TypeError, ValueError):
+        return None, 'فئة المصروف غير صالحة.'
+    if not get_category_or_404(cursor, category_id):
+        return None, 'فئة المصروف غير موجودة.'
+    return category_id, None
+
 def budget_row_to_dict(row, running_balance=None):
     return {
         "id": row[0],
         "transaction_date": row[1],
         "amount": row[2],
         "description": row[3] or '',
-        "created_at": row[4],
+        "category_id": row[4],
+        "category_name": row[5] or '',
+        "created_at": row[6],
         "running_balance": running_balance,
     }
 
@@ -920,15 +978,71 @@ def fetch_budget_summary(cursor):
         "expenses_month": expenses_month,
     }
 
+@app.route('/api/budget/categories', methods=['GET'])
+def get_budget_categories():
+    conn = get_connection()
+    cursor = conn.cursor()
+    categories = fetch_budget_categories(cursor)
+    conn.close()
+    return jsonify(categories)
+
+@app.route('/api/budget/categories', methods=['POST'])
+def add_budget_category():
+    data = request.json or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({"success": False, "message": "اسم الفئة مطلوب."}), 400
+    if len(name) > 40:
+        return jsonify({"success": False, "message": "اسم الفئة طويل جداً."}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO budget_categories (name, is_system, created_at) VALUES (?, 0, ?)",
+            (name, now_iso()),
+        )
+        conn.commit()
+        category_id = cursor.lastrowid
+        conn.close()
+        return jsonify({"success": True, "message": "تمت إضافة الفئة.", "id": category_id, "name": name})
+    except sqlite3.IntegrityError:
+        return jsonify({"success": False, "message": "هذه الفئة موجودة مسبقاً."}), 400
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/budget/categories/<int:category_id>', methods=['DELETE'])
+def delete_budget_category(category_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        row = get_category_or_404(cursor, category_id)
+        if not row:
+            conn.close()
+            return jsonify({"success": False, "message": "الفئة غير موجودة."}), 404
+        if row[2]:
+            conn.close()
+            return jsonify({"success": False, "message": "لا يمكن حذف الفئات الأساسية."}), 400
+        cursor.execute("DELETE FROM budget_categories WHERE id = ?", (category_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "تم حذف الفئة."})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
 @app.route('/api/budget/transactions', methods=['GET'])
 def get_budget_transactions():
     conn = get_connection()
     cursor = conn.cursor()
     summary = fetch_budget_summary(cursor)
-    cursor.execute(
-        "SELECT id, transaction_date, amount, description, created_at "
-        "FROM budget_transactions ORDER BY transaction_date ASC, id ASC"
-    )
+    categories = fetch_budget_categories(cursor)
+    cursor.execute('''
+        SELECT t.id, t.transaction_date, t.amount, t.description, t.category_id,
+               c.name, t.created_at
+        FROM budget_transactions t
+        LEFT JOIN budget_categories c ON c.id = t.category_id
+        ORDER BY t.transaction_date ASC, t.id ASC
+    ''')
     rows = cursor.fetchall()
     running = 0.0
     with_balance = []
@@ -937,7 +1051,7 @@ def get_budget_transactions():
         with_balance.append(budget_row_to_dict(row, running))
     with_balance.reverse()
     conn.close()
-    return jsonify({"summary": summary, "transactions": with_balance})
+    return jsonify({"summary": summary, "categories": categories, "transactions": with_balance})
 
 @app.route('/api/budget/transactions', methods=['POST'])
 def add_budget_transaction():
@@ -952,16 +1066,18 @@ def add_budget_transaction():
         return jsonify({"success": False, "message": "تاريخ غير صالح."}), 400
     if amount == 'invalid':
         return jsonify({"success": False, "message": "المبلغ يجب أن يكون رقماً غير صفري."}), 400
-    if not description:
-        return jsonify({"success": False, "message": "الوصف مطلوب."}), 400
 
     try:
         conn = get_connection()
         cursor = conn.cursor()
+        category_id, category_error = resolve_expense_category_id(cursor, data.get('category_id'), amount)
+        if category_error:
+            conn.close()
+            return jsonify({"success": False, "message": category_error}), 400
         cursor.execute(
-            "INSERT INTO budget_transactions (transaction_date, amount, description, created_at) "
-            "VALUES (?, ?, ?, ?)",
-            (transaction_date, round(amount, 2), description, now_iso()),
+            "INSERT INTO budget_transactions (transaction_date, amount, description, category_id, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (transaction_date, round(amount, 2), description, category_id, now_iso()),
         )
         conn.commit()
         new_id = cursor.lastrowid
@@ -976,6 +1092,7 @@ def update_budget_transaction(transaction_id):
     transaction_date = data.get('transaction_date')
     description = data.get('description')
     amount_raw = data.get('amount')
+    category_id_raw = data.get('category_id')
 
     if transaction_date is not None:
         transaction_date = transaction_date.strip()
@@ -983,8 +1100,6 @@ def update_budget_transaction(transaction_id):
             return jsonify({"success": False, "message": "تاريخ غير صالح."}), 400
     if description is not None:
         description = description.strip()
-        if not description:
-            return jsonify({"success": False, "message": "الوصف مطلوب."}), 400
     amount = None
     if amount_raw is not None:
         amount = parse_amount(amount_raw)
@@ -1002,6 +1117,27 @@ def update_budget_transaction(transaction_id):
             conn.close()
             return jsonify({"success": False, "message": "الحركة غير موجودة."}), 404
 
+        cursor.execute("SELECT amount FROM budget_transactions WHERE id = ?", (transaction_id,))
+        current_row = cursor.fetchone()
+        current_amount = current_row[0] if current_row else 0
+        new_amount = amount if amount is not None else current_amount
+
+        category_id = None
+        category_touched = category_id_raw is not None or amount is not None
+        if category_touched:
+            if new_amount >= 0:
+                category_id = None
+            else:
+                raw = category_id_raw if category_id_raw is not None else None
+                if raw is None and amount is None:
+                    cursor.execute("SELECT category_id FROM budget_transactions WHERE id = ?", (transaction_id,))
+                    category_id = cursor.fetchone()[0]
+                else:
+                    category_id, category_error = resolve_expense_category_id(cursor, raw, new_amount)
+                    if category_error:
+                        conn.close()
+                        return jsonify({"success": False, "message": category_error}), 400
+
         updates = []
         values = []
         if transaction_date is not None:
@@ -1013,6 +1149,9 @@ def update_budget_transaction(transaction_id):
         if amount is not None:
             updates.append("amount = ?")
             values.append(round(amount, 2))
+        if category_touched:
+            updates.append("category_id = ?")
+            values.append(category_id)
 
         if not updates:
             conn.close()
