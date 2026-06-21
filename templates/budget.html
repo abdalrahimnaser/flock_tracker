@@ -122,7 +122,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="text-xs font-medium text-stone-500 block mb-1">المبلغ</label>
-                        <input type="number" id="amount" min="0" step="0.01" required placeholder="0.00" lang="en"
+                        <input type="text" id="amount" inputmode="decimal" lang="en" required placeholder="0.00"
                             class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 num">
                     </div>
                     <div>
@@ -232,7 +232,7 @@
                 </div>
                 <div>
                     <label class="text-xs font-medium text-stone-500 block mb-1">المبلغ</label>
-                    <input type="number" id="editAmount" min="0" step="0.01" required lang="en"
+                    <input type="text" id="editAmount" inputmode="decimal" lang="en" required
                         class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 num">
                 </div>
                 <div>
@@ -273,6 +273,38 @@
         let filterPanelOpen = false;
 
         const numFmt = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+
+        const EASTERN_DIGITS = '٠١٢٣٤٥٦٧٨٩';
+        const PERSIAN_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
+
+        function toWesternDigits(value) {
+            return String(value ?? '').replace(/[٠-٩۰-۹]/g, ch => {
+                let i = EASTERN_DIGITS.indexOf(ch);
+                if (i >= 0) return String(i);
+                i = PERSIAN_DIGITS.indexOf(ch);
+                return i >= 0 ? String(i) : ch;
+            });
+        }
+
+        function normalizeDecimalInput(value) {
+            let next = toWesternDigits(value).replace(/[^0-9.]/g, '');
+            const dot = next.indexOf('.');
+            if (dot !== -1) {
+                next = next.slice(0, dot + 1) + next.slice(dot + 1).replace(/\./g, '');
+            }
+            return next;
+        }
+
+        function bindWesternDigitInput(el) {
+            if (!el) return;
+            el.addEventListener('input', () => {
+                const next = normalizeDecimalInput(el.value);
+                if (next !== el.value) el.value = next;
+            });
+        }
+
+        bindWesternDigitInput(document.getElementById('amount'));
+        bindWesternDigitInput(document.getElementById('editAmount'));
         const fmt = (n) => {
             const abs = Math.abs(n).toLocaleString('en-US', numFmt);
             return n < 0 ? `-${abs}` : `+${abs}`;
@@ -560,7 +592,7 @@
 
         document.getElementById('addForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const raw = parseFloat(document.getElementById('amount').value);
+            const raw = parseFloat(normalizeDecimalInput(document.getElementById('amount').value));
             const amount = entryType === 'out' ? -Math.abs(raw) : Math.abs(raw);
             const payload = {
                 amount,
@@ -608,7 +640,7 @@
         document.getElementById('editForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const id = document.getElementById('editId').value;
-            const raw = parseFloat(document.getElementById('editAmount').value);
+            const raw = parseFloat(normalizeDecimalInput(document.getElementById('editAmount').value));
             const amount = editType === 'out' ? -Math.abs(raw) : Math.abs(raw);
             const payload = {
                 amount,

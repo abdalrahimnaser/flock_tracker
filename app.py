@@ -126,6 +126,34 @@ def init_db():
 def now_iso():
     return datetime.now().isoformat(timespec='seconds')
 
+def to_western_digits(value):
+    if value is None:
+        return ''
+    eastern = '٠١٢٣٤٥٦٧٨٩'
+    persian = '۰۱۲۳۴۵۶۷۸۹'
+    chars = []
+    for ch in str(value):
+        if ch in eastern:
+            chars.append(str(eastern.index(ch)))
+        elif ch in persian:
+            chars.append(str(persian.index(ch)))
+        else:
+            chars.append(ch)
+    return ''.join(chars)
+
+def normalize_tag_id(value):
+    tag_id = to_western_digits(value).strip()
+    if not tag_id:
+        return '', None
+    if not tag_id.isdigit():
+        return tag_id, 'رقم الخروف يجب أن يحتوي على أرقام إنجليزية (0-9) فقط.'
+    return tag_id, None
+
+@app.url_value_preprocessor
+def normalize_url_tag_id(endpoint, values):
+    if values and 'tag_id' in values:
+        values['tag_id'] = to_western_digits(values['tag_id']).strip()
+
 def parse_date(value):
     if not value:
         return None
@@ -138,7 +166,7 @@ def parse_fetus_count(value):
     if value is None or value == '':
         return None
     try:
-        count = int(value)
+        count = int(to_western_digits(value).strip())
     except (TypeError, ValueError):
         return 'invalid'
     if count < 0:
@@ -411,16 +439,18 @@ def get_sheep():
 def add_sheep():
     """Saves a new sheep record with comprehensive metrics."""
     data = request.json
-    tag_id = data.get('tag_id', '').strip()
+    tag_id, tag_error = normalize_tag_id(data.get('tag_id', ''))
+    if tag_error:
+        return jsonify({"success": False, "message": tag_error}), 400
     name = data.get('name', '').strip()
     breed = data.get('breed', '').strip()
     sheep_type = data.get('sheep_type', '').strip()
     birth_date = normalize_birth_date(data.get('birth_date', ''))
     purchase_date = data.get('purchase_date', '').strip()
-    purchase_price_str = data.get('purchase_price', '').strip()
+    purchase_price_str = to_western_digits(data.get('purchase_price', '')).strip()
     purchase_location = data.get('purchase_location', '').strip()
     notes = data.get('notes', '').strip()
-    mother_id = data.get('mother_id', '').strip()
+    mother_id = to_western_digits(data.get('mother_id', '')).strip()
     life_status = data.get('life_status', '').strip() or 'حي'
 
     if not tag_id:
@@ -471,10 +501,10 @@ def update_sheep(tag_id):
     sheep_type = data.get('sheep_type', '').strip()
     birth_date = normalize_birth_date(data.get('birth_date', ''))
     purchase_date = data.get('purchase_date', '').strip()
-    purchase_price_str = data.get('purchase_price', '').strip()
+    purchase_price_str = to_western_digits(data.get('purchase_price', '')).strip()
     purchase_location = data.get('purchase_location', '').strip()
     notes = data.get('notes', '').strip()
-    mother_id = data.get('mother_id', '').strip()
+    mother_id = to_western_digits(data.get('mother_id', '')).strip()
     life_status = data.get('life_status', '').strip() or 'حي'
 
     if mother_id == tag_id:
@@ -849,7 +879,7 @@ def parse_amount(value):
     if value is None or value == '':
         return None
     try:
-        amount = float(value)
+        amount = float(to_western_digits(value).strip())
     except (TypeError, ValueError):
         return 'invalid'
     if amount == 0:

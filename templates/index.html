@@ -104,10 +104,10 @@
                         <div>
                             <span class="text-xs font-medium text-stone-500 mb-2 block">عمر</span>
                             <div class="flex flex-wrap items-center gap-2">
-                                <input type="number" id="ageFilterMin" min="0" step="1" placeholder="من"
+                                <input type="text" id="ageFilterMin" inputmode="numeric" lang="en" min="0" step="1" placeholder="من"
                                     class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
                                 <span class="text-stone-400 text-xs">—</span>
-                                <input type="number" id="ageFilterMax" min="0" step="1" placeholder="إلى"
+                                <input type="text" id="ageFilterMax" inputmode="numeric" lang="en" min="0" step="1" placeholder="إلى"
                                     class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
                                 <select id="ageFilterUnit"
                                     class="bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
@@ -121,10 +121,10 @@
                             <span class="text-xs font-medium text-stone-500 mb-2 block">المدة منذ آخر تلقيح (الدورة الحالية)</span>
                             <div id="activeCycleAgeFilters" class="flex flex-wrap gap-1.5 mb-2"></div>
                             <div id="activeCycleCustomFields" class="hidden flex flex-wrap items-center gap-2">
-                                <input type="number" id="activeCycleMin" min="0" step="1" placeholder="من"
+                                <input type="text" id="activeCycleMin" inputmode="numeric" lang="en" min="0" step="1" placeholder="من"
                                     class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
                                 <span class="text-stone-400 text-xs">—</span>
-                                <input type="number" id="activeCycleMax" min="0" step="1" placeholder="إلى"
+                                <input type="text" id="activeCycleMax" inputmode="numeric" lang="en" min="0" step="1" placeholder="إلى"
                                     class="w-20 bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
                                 <select id="activeCycleUnit"
                                     class="bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500">
@@ -146,7 +146,7 @@
                 </div>
 
                 <div class="relative">
-                    <input type="text" id="searchBar" placeholder="ابحث برقم الخروف..."
+                    <input type="text" id="searchBar" placeholder="ابحث برقم الخروف..." inputmode="numeric" lang="en"
                         class="w-full bg-white border border-stone-200 rounded-xl py-2.5 pr-10 pl-4 text-stone-900 placeholder:text-stone-400 focus:ring-2 focus:ring-lime-500/30 focus:border-lime-500 outline-none text-sm shadow-sm">
                     <svg class="w-4 h-4 text-stone-400 absolute top-1/2 -translate-y-1/2 right-3 pointer-events-none" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true">
                         <circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M20 20l-3-3"/>
@@ -188,17 +188,16 @@
 
                 <div>
                     <label class="block text-sm font-medium mb-1 text-stone-700">رقم الخروف *</label>
-                    <input type="text" id="tag_id" required class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500 disabled:opacity-50">
+                    <input type="text" id="tag_id" required inputmode="numeric" lang="en" autocomplete="off"
+                        class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500 disabled:opacity-50">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-1 text-stone-700">سلالة الخروف</label>
-                    <input type="text" id="breed" list="breedOptions" class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500" placeholder="غير محدد">
-                    <datalist id="breedOptions">
-                        <option value="دروبر">
-                        <option value="سفلك">
-                        <option value="عساف">
-                        <option value="بلدي">
-                    </datalist>
+                    <label class="block text-sm font-medium mb-2 text-stone-700">سلالة الخروف</label>
+                    <div id="breedChips" class="flex flex-wrap gap-2"></div>
+                    <div id="breedCustomWrap" class="hidden mt-3">
+                        <label class="block text-xs font-medium mb-1 text-stone-500">اكتب السلالة</label>
+                        <input type="text" id="breed_custom" class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500" placeholder="مثال: نجدي">
+                    </div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1 text-stone-700">جنس الخروف</label>
@@ -239,7 +238,8 @@
                     </div>
                     <div>
                         <label class="block text-xs font-medium mb-1 text-stone-500">سعر الشراء</label>
-                        <input type="number" step="0.01" id="purchase_price" class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                        <input type="text" id="purchase_price" inputmode="decimal" lang="en"
+                            class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
                     </div>
                     <div>
                         <label class="block text-xs font-medium mb-1 text-stone-500">مكان الشراء</label>
@@ -334,7 +334,7 @@
                 </div>
                 <div id="reproFetusGroup" class="hidden">
                     <label class="block text-sm font-medium mb-1 text-stone-700">عدد الأجنة <span class="text-stone-400 font-normal">(اختياري)</span></label>
-                    <input type="number" id="reproFetusCount" min="0" step="1" placeholder="مثال: 2"
+                    <input type="text" id="reproFetusCount" inputmode="numeric" lang="en" placeholder="مثال: 2"
                         class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
                 </div>
                 <div>
@@ -363,6 +363,56 @@
         let pendingPhotoFile = null;
         let removeExistingPhoto = false;
         let existingPhotoUrl = null;
+        const DEFAULT_BREEDS = ['دروبر', 'سفلك', 'عساف', 'بلدي'];
+        const BREED_OTHER = '__other__';
+        let knownBreeds = [...DEFAULT_BREEDS];
+        let selectedBreedMode = '';
+
+        const EASTERN_DIGITS = '٠١٢٣٤٥٦٧٨٩';
+        const PERSIAN_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
+
+        function toWesternDigits(value) {
+            return String(value ?? '').replace(/[٠-٩۰-۹]/g, ch => {
+                let i = EASTERN_DIGITS.indexOf(ch);
+                if (i >= 0) return String(i);
+                i = PERSIAN_DIGITS.indexOf(ch);
+                return i >= 0 ? String(i) : ch;
+            });
+        }
+
+        function extractDigits(value) {
+            return toWesternDigits(value).replace(/\D/g, '');
+        }
+
+        function normalizeDecimalInput(value) {
+            let next = toWesternDigits(value).replace(/[^0-9.]/g, '');
+            const dot = next.indexOf('.');
+            if (dot !== -1) {
+                next = next.slice(0, dot + 1) + next.slice(dot + 1).replace(/\./g, '');
+            }
+            return next;
+        }
+
+        function bindWesternDigitInput(el, { mode = 'digits' } = {}) {
+            if (!el) return;
+            const normalize = () => {
+                let next;
+                if (mode === 'digits') next = extractDigits(el.value);
+                else if (mode === 'decimal') next = normalizeDecimalInput(el.value);
+                else next = toWesternDigits(el.value);
+                if (next !== el.value) el.value = next;
+            };
+            el.addEventListener('input', normalize);
+        }
+
+        function setupWesternDigitInputs() {
+            bindWesternDigitInput(document.getElementById('tag_id'), { mode: 'digits' });
+            bindWesternDigitInput(document.getElementById('searchBar'), { mode: 'digits' });
+            ['ageFilterMin', 'ageFilterMax', 'activeCycleMin', 'activeCycleMax', 'reproFetusCount'].forEach(id => {
+                bindWesternDigitInput(document.getElementById(id), { mode: 'digits' });
+            });
+            bindWesternDigitInput(document.getElementById('purchase_price'), { mode: 'decimal' });
+        }
 
         const LIFE_FILTER_OPTIONS = [
             { value: '', label: 'الكل' },
@@ -416,6 +466,12 @@
             updatePurchaseFieldsVisibility();
             document.getElementById('sheep_photo').addEventListener('change', handlePhotoSelect);
             document.getElementById('clearPhotoBtn').addEventListener('click', clearPhotoSelection);
+            document.getElementById('breedChips').addEventListener('click', (e) => {
+                const chip = e.target.closest('.breed-pick-chip');
+                if (chip) setBreedSelection(chip.getAttribute('data-breed-value') ?? '');
+            });
+            renderBreedPicker('');
+            setupWesternDigitInputs();
         });
 
         function handlePhotoSelect(e) {
@@ -525,16 +581,83 @@
             try {
                 const response = await fetch('/api/breeds');
                 const cloudBreeds = await response.json();
-                const datalist = document.getElementById('breedOptions');
-                const defaults = ['دروبر', 'سفلك', 'عساف', 'بلدي'];
-                cloudBreeds.forEach(b => {
-                    if (!defaults.includes(b)) {
-                        const opt = document.createElement('option');
-                        opt.value = b;
-                        datalist.appendChild(opt);
-                    }
-                });
+                knownBreeds = [...new Set([...DEFAULT_BREEDS, ...cloudBreeds])];
+                renderBreedPicker(getBreedValue());
             } catch (err) { console.error(err); }
+        }
+
+        function getAllBreedOptions() {
+            const extra = knownBreeds.filter(b => !DEFAULT_BREEDS.includes(b)).sort((a, b) => a.localeCompare(b, 'ar'));
+            return [...DEFAULT_BREEDS, ...extra];
+        }
+
+        function breedPickChipClass(active) {
+            return active
+                ? 'bg-lime-600 border-lime-600 text-white shadow-sm'
+                : 'bg-white border-stone-200 text-stone-700 hover:border-stone-300 hover:bg-stone-50';
+        }
+
+        function renderBreedPicker(currentBreed = '') {
+            const container = document.getElementById('breedChips');
+            if (!container) return;
+
+            currentBreed = (currentBreed || '').trim();
+            const options = getAllBreedOptions();
+            let customValue = '';
+
+            if (!currentBreed) {
+                selectedBreedMode = '';
+            } else if (options.includes(currentBreed)) {
+                selectedBreedMode = currentBreed;
+            } else {
+                selectedBreedMode = BREED_OTHER;
+                customValue = currentBreed;
+            }
+
+            const chips = [
+                ...options.map(b => ({ value: b, label: b })),
+                { value: '', label: 'غير محدد' },
+                { value: BREED_OTHER, label: 'أخرى' },
+            ];
+
+            container.innerHTML = chips.map(chip => `
+                <button type="button" data-breed-value="${escapeHtml(chip.value)}" class="breed-pick-chip min-w-[4.5rem] px-3 py-2 rounded-lg text-sm font-medium border transition ${breedPickChipClass(chip.value === selectedBreedMode)}">${escapeHtml(chip.label)}</button>
+            `).join('');
+
+            const customWrap = document.getElementById('breedCustomWrap');
+            const customInput = document.getElementById('breed_custom');
+            if (selectedBreedMode === BREED_OTHER) {
+                customWrap.classList.remove('hidden');
+                customInput.value = customValue;
+            } else {
+                customWrap.classList.add('hidden');
+                customInput.value = '';
+            }
+        }
+
+        function setBreedSelection(value) {
+            selectedBreedMode = value;
+            document.querySelectorAll('.breed-pick-chip').forEach(chip => {
+                const val = chip.getAttribute('data-breed-value');
+                chip.className = `breed-pick-chip min-w-[4.5rem] px-3 py-2 rounded-lg text-sm font-medium border transition ${breedPickChipClass(val === selectedBreedMode)}`;
+            });
+
+            const customWrap = document.getElementById('breedCustomWrap');
+            const customInput = document.getElementById('breed_custom');
+            if (value === BREED_OTHER) {
+                customWrap.classList.remove('hidden');
+                customInput.focus();
+            } else {
+                customWrap.classList.add('hidden');
+                customInput.value = '';
+            }
+        }
+
+        function getBreedValue() {
+            if (selectedBreedMode === BREED_OTHER) {
+                return document.getElementById('breed_custom').value.trim();
+            }
+            return selectedBreedMode || '';
         }
 
         function populateMotherOptions(excludeTagId = '') {
@@ -825,8 +948,8 @@
 
         function getDurationFilterBounds(minId, maxId, unitId) {
             const { minRaw, maxRaw, unit } = getDurationFilterValues(minId, maxId, unitId);
-            let min = minRaw !== '' ? Number(minRaw) : null;
-            let max = maxRaw !== '' ? Number(maxRaw) : null;
+            let min = minRaw !== '' ? Number(extractDigits(minRaw)) : null;
+            let max = maxRaw !== '' ? Number(extractDigits(maxRaw)) : null;
             if (min !== null && max !== null && min > max) [min, max] = [max, min];
             return { min, max, unit };
         }
@@ -1151,7 +1274,7 @@
         }
 
         function applyFilters() {
-            const query = document.getElementById('searchBar').value.trim().toLowerCase();
+            const query = extractDigits(document.getElementById('searchBar').value.trim());
             let filtered = allSheep;
 
             if (activeBreedFilter) {
@@ -1179,7 +1302,7 @@
                 filtered = filtered.filter(s => matchesSonarSinceFilter(s));
             }
             if (query) {
-                filtered = filtered.filter(s => s.tag_id.toLowerCase().includes(query));
+                filtered = filtered.filter(s => extractDigits(s.tag_id).includes(query));
             }
 
             renderCards(filtered);
@@ -1222,7 +1345,7 @@
             }
             return {
                 purchase_date: document.getElementById('purchase_date').value,
-                purchase_price: document.getElementById('purchase_price').value,
+                purchase_price: normalizeDecimalInput(document.getElementById('purchase_price').value),
                 purchase_location: document.getElementById('purchase_location').value,
             };
         }
@@ -1476,7 +1599,7 @@
             document.getElementById('tag_id').value = sheep.tag_id;
             document.getElementById('tag_id').disabled = true;
             document.getElementById('name').value = sheep.name || '';
-            document.getElementById('breed').value = sheep.breed || '';
+            renderBreedPicker(sheep.breed || '');
             document.getElementById('sheep_type').value = sheep.sheep_type || 'حملة';
             document.getElementById('life_status').value = sheep.life_status || 'حي';
             document.getElementById('birth_date').value = sheep.birth_date || todayDateString();
@@ -1516,6 +1639,7 @@
             document.getElementById('birth_date').value = todayDateString();
             populateMotherOptions();
             setSheepOrigin('farm');
+            renderBreedPicker('');
             pendingPhotoFile = null;
             removeExistingPhoto = false;
             existingPhotoUrl = null;
@@ -1634,11 +1758,16 @@
         document.getElementById('sheepForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const mode = document.getElementById('formMode').value;
-            const tagId = document.getElementById('tag_id').value;
+            const tagId = extractDigits(document.getElementById('tag_id').value);
+            if (!tagId) {
+                showToast('الرجاء إدخال رقم الخروف بأرقام إنجليزية (0-9).', 'error');
+                return;
+            }
+            document.getElementById('tag_id').value = tagId;
 
             const payload = {
                 name: document.getElementById('name').value,
-                breed: document.getElementById('breed').value,
+                breed: getBreedValue(),
                 sheep_type: document.getElementById('sheep_type').value,
                 life_status: document.getElementById('life_status').value,
                 birth_date: document.getElementById('birth_date').value || todayDateString(),
@@ -1712,7 +1841,7 @@
             if (mode === 'ultrasound') {
                 url = `/api/matings/${matingId}/ultrasounds`;
                 payload.result = document.getElementById('reproResult').value;
-                const fetusRaw = document.getElementById('reproFetusCount').value.trim();
+                const fetusRaw = extractDigits(document.getElementById('reproFetusCount').value.trim());
                 if (fetusRaw !== '') payload.fetus_count = Number(fetusRaw);
                 delete payload.mated_date;
             } else {
