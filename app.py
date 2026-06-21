@@ -135,6 +135,7 @@ def init_db():
     if 'category_id' not in budget_columns:
         cursor.execute("ALTER TABLE budget_transactions ADD COLUMN category_id INTEGER REFERENCES budget_categories(id) ON DELETE SET NULL")
     seed_budget_categories(cursor)
+    remove_budget_category_by_name(cursor, 'صيانة')
     conn.commit()
     conn.close()
 
@@ -901,7 +902,7 @@ def parse_amount(value):
         return 'invalid'
     return amount
 
-DEFAULT_BUDGET_CATEGORIES = ('علف', 'طبي', 'صيانة', 'أخرى')
+DEFAULT_BUDGET_CATEGORIES = ('علف', 'طبي', 'أخرى')
 
 def seed_budget_categories(cursor):
     cursor.execute("SELECT COUNT(*) FROM budget_categories")
@@ -912,6 +913,9 @@ def seed_budget_categories(cursor):
             "INSERT OR IGNORE INTO budget_categories (name, is_system, created_at) VALUES (?, 1, ?)",
             (name, now_iso()),
         )
+
+def remove_budget_category_by_name(cursor, name):
+    cursor.execute("DELETE FROM budget_categories WHERE name = ?", (name,))
 
 def fetch_budget_categories(cursor):
     cursor.execute(

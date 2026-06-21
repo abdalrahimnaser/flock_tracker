@@ -68,12 +68,28 @@
         .tx-feed-month:first-child { padding-top: 0; }
         .stat-box { min-width: 0; overflow: hidden; }
         .stat-value {
-            font-size: clamp(0.8125rem, 3.2vw, 1.5rem);
-            line-height: 1.25;
+            font-size: clamp(1.0625rem, 4.8vw, 1.5rem);
+            line-height: 1.2;
             max-width: 100%;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+        .stat-balance-hero {
+            font-size: clamp(1.75rem, 7vw, 2.25rem);
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+        }
+        .stats-card { overflow: hidden; }
+        @media (max-width: 639px) {
+            .stat-label { font-size: 0.8125rem; line-height: 1.3; }
+            .stats-split > div { padding-top: 0.875rem; padding-bottom: 0.875rem; }
+            .stats-hero { padding-top: 1rem; padding-bottom: 1.125rem; }
+            .add-form-section { padding: 0.875rem; }
+            .add-form-section h2 { font-size: 1rem; margin-bottom: 0.75rem; }
+            .add-form-section .form-stack { gap: 0.75rem; }
+            .add-form-section .field-input { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+            .add-form-section .submit-btn { padding-top: 0.625rem; padding-bottom: 0.625rem; }
         }
         .filter-panel { transition: max-height 0.25s ease, opacity 0.2s ease, padding 0.25s ease; }
         .filter-panel:not(.expanded) { padding-top: 0; padding-bottom: 0; border-width: 0; }
@@ -98,70 +114,72 @@
     </nav>
 
     <div class="container mx-auto p-4 max-w-3xl">
-        <header class="my-6 text-center">
-            <h1 class="text-3xl font-bold text-amber-700">ميزانية المزرعة</h1>
+        <header class="my-4 sm:my-6 text-center">
+            <h1 class="text-2xl sm:text-3xl font-bold text-amber-700">ميزانية المزرعة</h1>
             <p class="text-stone-500 text-sm mt-1">تتبع النقدية — إيرادات ومصروفات</p>
         </header>
 
-        <div id="statsBar" class="grid grid-cols-3 gap-2 sm:gap-3 text-center mb-6">
-            <div class="stat-box bg-white border border-stone-200 rounded-xl p-3 sm:p-4 shadow-sm">
-                <div id="statBalance" class="stat-value font-bold text-amber-700 num">—</div>
-                <div class="text-[11px] sm:text-xs text-stone-500 mt-0.5">الرصيد الحالي</div>
+        <div id="statsBar" class="stats-card bg-white border border-stone-200 rounded-xl shadow-sm mb-4 sm:mb-6">
+            <div class="stats-hero text-center py-4 sm:py-5 px-4 border-b border-stone-100">
+                <div class="stat-label text-xs sm:text-sm text-stone-500 mb-1">الرصيد الحالي</div>
+                <div id="statBalance" class="stat-value stat-balance-hero font-bold text-amber-700 num">—</div>
             </div>
-            <div class="stat-box bg-white border border-stone-200 rounded-xl p-3 sm:p-4 shadow-sm">
-                <div id="statIncome" class="stat-value font-bold text-emerald-600 num">—</div>
-                <div class="text-[11px] sm:text-xs text-stone-500 mt-0.5">إيرادات الشهر</div>
-            </div>
-            <div class="stat-box bg-white border border-stone-200 rounded-xl p-3 sm:p-4 shadow-sm">
-                <div id="statExpenses" class="stat-value font-bold text-red-600 num">—</div>
-                <div class="text-[11px] sm:text-xs text-stone-500 mt-0.5">مصروفات الشهر</div>
+            <div class="stats-split grid grid-cols-2 divide-x divide-stone-100">
+                <div class="text-center py-3.5 sm:py-4 px-3">
+                    <div class="stat-label text-xs text-stone-500 mb-1">إيرادات الشهر</div>
+                    <div id="statIncome" class="stat-value font-bold text-emerald-600 num">—</div>
+                </div>
+                <div class="text-center py-3.5 sm:py-4 px-3">
+                    <div class="stat-label text-xs text-stone-500 mb-1">مصروفات الشهر</div>
+                    <div id="statExpenses" class="stat-value font-bold text-red-600 num">—</div>
+                </div>
             </div>
         </div>
 
-        <section class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-stone-200 mb-6">
-            <h2 class="text-lg font-bold mb-4">تسجيل حركة جديدة</h2>
-            <form id="addForm" class="space-y-4">
+        <section class="add-form-section bg-white p-3 sm:p-6 rounded-xl shadow-sm border border-stone-200 mb-4 sm:mb-6">
+            <h2 class="text-base sm:text-lg font-bold">تسجيل حركة جديدة</h2>
+            <form id="addForm" class="form-stack flex flex-col space-y-3 sm:space-y-4">
                 <div class="flex gap-2">
                     <button type="button" id="btnIncome" data-type="in"
-                        class="type-btn flex-1 py-2.5 rounded-lg border border-stone-200 text-sm font-medium transition hover:border-emerald-400">
+                        class="type-btn flex-1 py-2 sm:py-2.5 rounded-lg border border-stone-200 text-sm font-medium transition hover:border-emerald-400">
                         إيراد
                     </button>
                     <button type="button" id="btnExpense" data-type="out"
-                        class="type-btn flex-1 py-2.5 rounded-lg border border-stone-200 text-sm font-medium transition hover:border-red-400 selected-out">
+                        class="type-btn flex-1 py-2 sm:py-2.5 rounded-lg border border-stone-200 text-sm font-medium transition hover:border-red-400 selected-out">
                         مصروف
                     </button>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="grid grid-cols-2 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
                         <label class="text-xs font-medium text-stone-500 block mb-1">المبلغ</label>
                         <input type="text" id="amount" inputmode="decimal" lang="en" required placeholder="0.00"
-                            class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 num">
+                            class="field-input w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 sm:py-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 num">
                     </div>
                     <div>
                         <label class="text-xs font-medium text-stone-500 block mb-1">التاريخ</label>
                         <input type="date" id="transactionDate" required
-                            class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
+                            class="field-input w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 sm:py-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
                     </div>
                 </div>
-                <div id="addCategoryWrap" class="space-y-2">
+                <div id="addCategoryWrap" class="space-y-1.5 sm:space-y-2">
                     <label class="text-xs font-medium text-stone-500 block">فئة المصروف *</label>
                     <div id="addCategoryChips" class="flex flex-wrap gap-1.5"></div>
                     <div class="flex gap-2">
                         <input type="text" id="newCategoryName" placeholder="فئة جديدة..."
-                            class="flex-1 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
+                            class="flex-1 bg-stone-50 border border-stone-200 rounded-lg px-3 py-1.5 sm:py-2 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
                         <button type="button" id="addCategoryBtn"
-                            class="shrink-0 px-3 py-2 rounded-lg border border-stone-200 bg-white text-sm font-medium text-stone-700 hover:bg-stone-50 transition">
+                            class="shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-stone-200 bg-white text-sm font-medium text-stone-700 hover:bg-stone-50 transition">
                             + إضافة
                         </button>
                     </div>
                 </div>
                 <div>
                     <label class="text-xs font-medium text-stone-500 block mb-1">الوصف <span class="text-stone-400 font-normal">(اختياري)</span></label>
-                    <input type="text" id="description" placeholder="مثال: علف شعير، فحص بيطري، إصلاح سياج..."
-                        class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
+                    <input type="text" id="description" placeholder="مثال: علف شعير، فحص بيطري..."
+                        class="field-input w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 sm:py-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
                 </div>
                 <button type="submit"
-                    class="w-full py-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium transition shadow-sm">
+                    class="submit-btn w-full py-2.5 sm:py-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium transition shadow-sm">
                     حفظ
                 </button>
             </form>
@@ -178,7 +196,7 @@
                     <h3 class="text-sm font-bold text-amber-900">ملخص النتائج المفلترة</h3>
                     <span id="filterSummaryLabel" class="text-xs text-amber-800/80"></span>
                 </div>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                <div class="grid grid-cols-2 gap-3 text-center">
                     <div class="bg-white/70 rounded-lg p-2.5 border border-amber-100">
                         <div id="fsExpenses" class="num font-bold text-red-600 text-sm sm:text-base">—</div>
                         <div class="text-[11px] text-stone-500 mt-0.5">مصروفات</div>
@@ -186,14 +204,6 @@
                     <div class="bg-white/70 rounded-lg p-2.5 border border-amber-100">
                         <div id="fsIncome" class="num font-bold text-emerald-600 text-sm sm:text-base">—</div>
                         <div class="text-[11px] text-stone-500 mt-0.5">إيرادات</div>
-                    </div>
-                    <div class="bg-white/70 rounded-lg p-2.5 border border-amber-100">
-                        <div id="fsNet" class="num font-bold text-amber-800 text-sm sm:text-base">—</div>
-                        <div class="text-[11px] text-stone-500 mt-0.5">صافي</div>
-                    </div>
-                    <div class="bg-white/70 rounded-lg p-2.5 border border-amber-100">
-                        <div id="fsCount" class="num font-bold text-stone-800 text-sm sm:text-base">—</div>
-                        <div class="text-[11px] text-stone-500 mt-0.5">عدد الحركات</div>
                     </div>
                 </div>
             </div>
@@ -531,7 +541,7 @@
         function renderSummary(s) {
             const bal = document.getElementById('statBalance');
             bal.textContent = fmtBalance(s.balance);
-            bal.className = `stat-value font-bold num ${s.balance >= 0 ? 'text-amber-700' : 'text-red-600'}`;
+            bal.className = `stat-value stat-balance-hero font-bold num ${s.balance >= 0 ? 'text-amber-700' : 'text-red-600'}`;
             const income = document.getElementById('statIncome');
             income.textContent = fmtBalance(s.income_month);
             income.className = 'stat-value font-bold text-emerald-600 num';
@@ -586,14 +596,9 @@
                 if (tx.amount > 0) income += tx.amount;
                 else expenses += Math.abs(tx.amount);
             });
-            const net = income - expenses;
 
             document.getElementById('fsExpenses').textContent = fmtBalance(expenses);
             document.getElementById('fsIncome').textContent = fmtBalance(income);
-            const netEl = document.getElementById('fsNet');
-            netEl.textContent = (net >= 0 ? '+' : '') + fmtBalance(net);
-            netEl.className = `num font-bold text-sm sm:text-base ${net >= 0 ? 'text-emerald-600' : 'text-red-600'}`;
-            document.getElementById('fsCount').textContent = String(filtered.length);
         }
 
         function syncFilterChips() {
