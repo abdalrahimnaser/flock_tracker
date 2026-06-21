@@ -84,7 +84,7 @@
                 <div id="filterPanel" class="filter-panel rounded-2xl bg-stone-50 border border-stone-200/80 px-4 py-0 space-y-4 max-h-0 opacity-0 overflow-hidden">
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
                         <div>
-                            <span class="text-xs font-medium text-stone-500 mb-2 block">حالة الحياة</span>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">الحالة</span>
                             <div id="lifeFilters" class="flex flex-wrap gap-1.5"></div>
                         </div>
                         <div>
@@ -207,10 +207,11 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-1 text-stone-700">حالة الحياة</label>
-                    <select id="life_status" required class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
+                    <label class="block text-sm font-medium mb-1 text-stone-700">الحالة</label>
+                    <select id="status" required class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
                         <option value="حي">حي</option>
                         <option value="ميت">ميت</option>
+                        <option value="مباع">مباع</option>
                     </select>
                 </div>
                 <div>
@@ -414,10 +415,11 @@
             bindWesternDigitInput(document.getElementById('purchase_price'), { mode: 'decimal' });
         }
 
-        const LIFE_FILTER_OPTIONS = [
+        const STATUS_FILTER_OPTIONS = [
             { value: '', label: 'الكل' },
             { value: 'حي', label: 'حي' },
             { value: 'ميت', label: 'ميت' },
+            { value: 'مباع', label: 'مباع' },
         ];
 
         const MOTHER_FILTER_OPTIONS = [
@@ -702,7 +704,7 @@
         }
 
         function renderLifeFilters() {
-            renderFilterGroup('lifeFilters', LIFE_FILTER_OPTIONS, activeLifeFilter, 'data-life');
+            renderFilterGroup('lifeFilters', STATUS_FILTER_OPTIONS, activeLifeFilter, 'data-life');
         }
 
         function renderMotherFilters() {
@@ -1199,9 +1201,10 @@
 
         function getChildCounts(tagId) {
             const children = getChildren(tagId);
-            const live = children.filter(c => c.life_status !== 'ميت').length;
-            const dead = children.filter(c => c.life_status === 'ميت').length;
-            return { live, dead, total: children.length };
+            const live = children.filter(c => (c.status || 'حي') === 'حي').length;
+            const dead = children.filter(c => c.status === 'ميت').length;
+            const sold = children.filter(c => c.status === 'مباع').length;
+            return { live, dead, sold, total: children.length };
         }
 
         function childCountLabel(count) {
@@ -1281,7 +1284,7 @@
                 filtered = filtered.filter(s => s.breed === activeBreedFilter);
             }
             if (activeLifeFilter) {
-                filtered = filtered.filter(s => activeLifeFilter === 'حي' ? s.life_status !== 'ميت' : s.life_status === 'ميت');
+                filtered = filtered.filter(s => (s.status || 'حي') === activeLifeFilter);
             }
             if (activeMotherFilter) {
                 filtered = filtered.filter(s => motherStatusLabel(s) === activeMotherFilter);
@@ -1379,9 +1382,12 @@
             list.innerHTML = data.map(s => {
                 const safeTag = escapeHtml(s.tag_id);
                 const isExpanded = expandedCards.has(s.tag_id);
-                const { live: liveChildren, dead: deadChildren, total: childCount } = getChildCounts(s.tag_id);
+                const { live: liveChildren, dead: deadChildren, sold: soldChildren, total: childCount } = getChildCounts(s.tag_id);
                 const children = getChildren(s.tag_id);
-                const isDead = s.life_status === 'ميت';
+                const sheepStatus = s.status || 'حي';
+                const isDead = sheepStatus === 'ميت';
+                const isSold = sheepStatus === 'مباع';
+                const cardStatusClass = isDead ? 'opacity-75' : isSold ? 'border-emerald-200 bg-emerald-50/40' : '';
 
                 const birthRow = s.birth_date
                     ? `<div class="flex justify-between text-sm"><span class="text-stone-500">تاريخ الولادة</span><span>${escapeHtml(s.birth_date)}</span></div>
@@ -1405,12 +1411,13 @@
                         ${birthRow}
                         <div class="flex justify-between text-sm"><span class="text-stone-500">مصدر الخروف</span><span>${escapeHtml(sheepOriginLabel(s))}</span></div>
                         ${s.sheep_type ? `<div class="flex justify-between text-sm"><span class="text-stone-500">جنس الخروف</span><span>${escapeHtml(s.sheep_type)}</span></div>` : ''}
-                        ${s.life_status ? `<div class="flex justify-between text-sm"><span class="text-stone-500">حالة الحياة</span><span>${escapeHtml(s.life_status)}</span></div>` : ''}
+                        ${sheepStatus ? `<div class="flex justify-between text-sm"><span class="text-stone-500">الحالة</span><span>${escapeHtml(sheepStatus)}</span></div>` : ''}
                         ${s.breed !== undefined ? `<div class="flex justify-between text-sm"><span class="text-stone-500">سلالة الخروف</span><span>${escapeHtml(breedLabel(s.breed))}</span></div>` : ''}
                         <div class="flex justify-between text-sm"><span class="text-stone-500">حالة الأم</span><span>${motherStatusLabel(s)}</span></div>
                         ${childCount > 0 ? `
                             ${liveChildren > 0 ? `<div class="flex justify-between text-sm"><span class="text-stone-500">أبناء أحياء</span><span>${childCountLabel(liveChildren)}</span></div>` : ''}
                             ${deadChildren > 0 ? `<div class="flex justify-between text-sm"><span class="text-stone-500">أبناء أموات</span><span>${childCountLabel(deadChildren)}</span></div>` : ''}
+                            ${soldChildren > 0 ? `<div class="flex justify-between text-sm"><span class="text-stone-500">أبناء مباعون</span><span>${childCountLabel(soldChildren)}</span></div>` : ''}
                         ` : ''}
                         ${children.length ? `<div class="text-sm"><span class="text-stone-500 block mb-1">أرقام الأبناء</span><span class="text-stone-800">${children.map(c => escapeHtml(c.tag_id)).join(' · ')}</span></div>` : ''}
                         ${s.mother_id ? `<div class="flex justify-between text-sm"><span class="text-stone-500">رقم الأم</span><span>${escapeHtml(s.mother_id)}</span></div>` : `<div class="flex justify-between text-sm"><span class="text-stone-500">رقم الأم</span><span>غير محدد</span></div>`}`;
@@ -1429,7 +1436,7 @@
                     </div>`;
 
                 return `
-                <div class="border border-stone-200 rounded-lg overflow-hidden bg-white ${isDead ? 'opacity-75' : ''}" data-tag="${safeTag}">
+                <div class="border border-stone-200 rounded-lg overflow-hidden bg-white ${cardStatusClass}" data-tag="${safeTag}">
                     <div class="px-3 py-3 cursor-pointer select-none card-header">
                         <div class="flex items-center justify-between gap-4" dir="ltr">
                             <div class="flex items-center gap-0.5 shrink-0">
@@ -1444,6 +1451,8 @@
                             <div class="flex-1 min-w-0 text-right" dir="rtl">
                                 <div class="flex items-baseline gap-2 flex-wrap justify-start">
                                     <span class="text-xl font-semibold text-stone-900">${safeTag}</span>
+                                    ${isSold ? `<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">مباع</span>` : ''}
+                                    ${isDead ? `<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-stone-200 text-stone-600">ميت</span>` : ''}
                                 </div>
                             </div>
                         </div>
@@ -1601,7 +1610,7 @@
             document.getElementById('name').value = sheep.name || '';
             renderBreedPicker(sheep.breed || '');
             document.getElementById('sheep_type').value = sheep.sheep_type || 'حملة';
-            document.getElementById('life_status').value = sheep.life_status || 'حي';
+            document.getElementById('status').value = sheep.status || 'حي';
             document.getElementById('birth_date').value = sheep.birth_date || todayDateString();
             populateMotherOptions(sheep.tag_id);
             document.getElementById('mother_id').value = sheep.mother_id || '';
@@ -1635,7 +1644,7 @@
         function resetFormState() {
             document.getElementById('sheepForm').reset();
             document.getElementById('tag_id').disabled = false;
-            document.getElementById('life_status').value = 'حي';
+            document.getElementById('status').value = 'حي';
             document.getElementById('birth_date').value = todayDateString();
             populateMotherOptions();
             setSheepOrigin('farm');
@@ -1769,7 +1778,7 @@
                 name: document.getElementById('name').value,
                 breed: getBreedValue(),
                 sheep_type: document.getElementById('sheep_type').value,
-                life_status: document.getElementById('life_status').value,
+                status: document.getElementById('status').value,
                 birth_date: document.getElementById('birth_date').value || todayDateString(),
                 mother_id: document.getElementById('mother_id').value,
                 ...purchasePayloadFields(),

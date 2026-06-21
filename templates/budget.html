@@ -59,6 +59,47 @@
         }
         .tx-feed-item:active { background: #fafaf9; }
         .tx-feed-item:last-child { border-bottom: none; }
+        .tx-feed-amount-col {
+            flex-shrink: 0;
+            width: 6.25rem;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.25rem;
+        }
+        .tx-feed-amount {
+            display: block;
+            width: 100%;
+            text-align: right;
+            white-space: nowrap;
+        }
+        .tx-feed-meta {
+            display: flex;
+            justify-content: flex-end;
+        }
+        .tx-feed-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 0.75rem;
+            direction: ltr;
+        }
+        .tx-feed-desc {
+            min-width: 0;
+            flex: 1;
+            direction: rtl;
+            text-align: left;
+        }
+        .tx-feed-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+            direction: rtl;
+        }
+        .tx-feed-footer-date {
+            direction: rtl;
+        }
         .tx-feed-month {
             font-size: 0.8125rem;
             font-weight: 700;
@@ -171,6 +212,19 @@
                             class="shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-stone-200 bg-white text-sm font-medium text-stone-700 hover:bg-stone-50 transition">
                             + إضافة
                         </button>
+                    </div>
+                </div>
+                <div id="addSheepSaleWrap" class="hidden space-y-2">
+                    <label class="flex items-center gap-2 cursor-pointer text-sm text-stone-700">
+                        <input type="checkbox" id="sheepSaleCheck" class="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500/40">
+                        <span>بيع خروف</span>
+                    </label>
+                    <div id="sheepSalePicker" class="hidden">
+                        <label class="text-xs font-medium text-stone-500 block mb-1">رقم الخروف *</label>
+                        <select id="soldSheepTag"
+                            class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 sm:py-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500">
+                            <option value="">اختر رقم الخروف</option>
+                        </select>
                     </div>
                 </div>
                 <div>
@@ -307,6 +361,19 @@
                     <label class="text-xs font-medium text-stone-500 block">فئة المصروف *</label>
                     <div id="editCategoryChips" class="flex flex-wrap gap-1.5"></div>
                 </div>
+                <div id="editSheepSaleWrap" class="hidden space-y-2">
+                    <label class="flex items-center gap-2 cursor-pointer text-sm text-stone-700">
+                        <input type="checkbox" id="editSheepSaleCheck" class="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500/40">
+                        <span>بيع خروف</span>
+                    </label>
+                    <div id="editSheepSalePicker" class="hidden">
+                        <label class="text-xs font-medium text-stone-500 block mb-1">رقم الخروف *</label>
+                        <select id="editSoldSheepTag"
+                            class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500">
+                            <option value="">اختر رقم الخروف</option>
+                        </select>
+                    </div>
+                </div>
                 <div>
                     <label class="text-xs font-medium text-stone-500 block mb-1">الوصف <span class="text-stone-400 font-normal">(اختياري)</span></label>
                     <input type="text" id="editDescription"
@@ -338,6 +405,7 @@
         let transactionsCache = [];
         let allTransactions = [];
         let categories = [];
+        let sheepList = [];
         let filterPanelOpen = false;
         let selectedAddCategoryId = null;
         let selectedEditCategoryId = null;
@@ -407,12 +475,94 @@
                 document.getElementById('editBtnIncome').classList.toggle('selected-in', type === 'in');
                 document.getElementById('editBtnExpense').classList.toggle('selected-out', type === 'out');
                 document.getElementById('editCategoryWrap').classList.toggle('hidden', type === 'in');
+                if (type !== 'in') {
+                    document.getElementById('editSheepSaleCheck').checked = false;
+                }
+                updateSheepSalePickerVisibility(true);
             } else {
                 entryType = type;
                 document.getElementById('btnIncome').classList.toggle('selected-in', type === 'in');
                 document.getElementById('btnExpense').classList.toggle('selected-out', type === 'out');
                 document.getElementById('addCategoryWrap').classList.toggle('hidden', type === 'in');
+                if (type !== 'in') {
+                    document.getElementById('sheepSaleCheck').checked = false;
+                }
+                updateSheepSalePickerVisibility(false);
             }
+        }
+
+        async function fetchSheepList() {
+            try {
+                const res = await fetch('/api/sheep');
+                sheepList = await res.json();
+                populateSheepSelects();
+            } catch {
+                sheepList = [];
+            }
+        }
+
+        function sellableSheep(extraTagId = '') {
+            const sellable = sheepList.filter(s => (s.status || 'حي') === 'حي');
+            if (extraTagId && !sellable.some(s => s.tag_id === extraTagId)) {
+                const extra = sheepList.find(s => s.tag_id === extraTagId);
+                if (extra) sellable.unshift(extra);
+            }
+            return sellable.sort((a, b) => a.tag_id.localeCompare(b.tag_id, 'ar'));
+        }
+
+        function populateSheepSelects(extraEditTag = '') {
+            const addOptions = sellableSheep().map(s => {
+                const label = s.name ? `${s.tag_id} — ${s.name}` : s.tag_id;
+                return `<option value="${escapeHtml(s.tag_id)}">${escapeHtml(label)}</option>`;
+            }).join('');
+            const editOptions = sellableSheep(extraEditTag).map(s => {
+                const label = s.name ? `${s.tag_id} — ${s.name}` : s.tag_id;
+                return `<option value="${escapeHtml(s.tag_id)}">${escapeHtml(label)}</option>`;
+            }).join('');
+            document.getElementById('soldSheepTag').innerHTML = `<option value="">اختر رقم الخروف</option>${addOptions}`;
+            const editSelect = document.getElementById('editSoldSheepTag');
+            const editValue = editSelect.value;
+            editSelect.innerHTML = `<option value="">اختر رقم الخروف</option>${editOptions}`;
+            if (editValue) editSelect.value = editValue;
+        }
+
+        function updateSheepSalePickerVisibility(isEdit = false) {
+            const wrap = document.getElementById(isEdit ? 'editSheepSaleWrap' : 'addSheepSaleWrap');
+            const check = document.getElementById(isEdit ? 'editSheepSaleCheck' : 'sheepSaleCheck');
+            const picker = document.getElementById(isEdit ? 'editSheepSalePicker' : 'sheepSalePicker');
+            const type = isEdit ? editType : entryType;
+            wrap.classList.toggle('hidden', type !== 'in');
+            picker.classList.toggle('hidden', type !== 'in' || !check.checked);
+        }
+
+        function sheepSalePayload(isEdit = false) {
+            const type = isEdit ? editType : entryType;
+            if (type !== 'in') {
+                return { sheep_sale: false, sold_sheep_tag_id: null };
+            }
+            const checked = document.getElementById(isEdit ? 'editSheepSaleCheck' : 'sheepSaleCheck').checked;
+            if (!checked) {
+                return { sheep_sale: false, sold_sheep_tag_id: null };
+            }
+            const tag = document.getElementById(isEdit ? 'editSoldSheepTag' : 'soldSheepTag').value;
+            if (!tag) {
+                return { error: 'الرجاء اختيار رقم الخروف المباع.' };
+            }
+            return { sheep_sale: true, sold_sheep_tag_id: tag };
+        }
+
+        function transactionTitleHtml(tx) {
+            if (tx.sold_sheep_tag_id) {
+                const tag = escapeHtml(tx.sold_sheep_tag_id);
+                const note = (tx.description || '').trim();
+                const notePart = note ? ` (${escapeHtml(note)})` : '';
+                return `بيع خروف <span class="num font-semibold">${tag}</span>${notePart}`;
+            }
+            return descriptionLabel(tx.description);
+        }
+
+        function transactionDescHtml(tx) {
+            return `<span class="block text-stone-800">${transactionTitleHtml(tx)}</span>`;
         }
 
         function categoryChipClass(active) {
@@ -532,6 +682,7 @@
                 if (!selectedAddCategoryId) setAddCategory(defaultCategoryId());
                 else renderCategoryPicker('addCategoryChips', selectedAddCategoryId);
                 renderCategoryFilters();
+                populateSheepSelects();
                 applyFiltersAndRender();
             } catch {
                 showToast('تعذر تحميل البيانات', 'error');
@@ -710,7 +861,7 @@
                     ${categoryCell}
                     <td class="col-amount"><span class="num font-semibold ${amountClass}">${fmt(tx.amount)}</span></td>
                     <td class="col-balance"><span class="num font-semibold text-stone-800">${fmtBalance(tx.running_balance)}</span></td>
-                    <td class="col-desc"><span class="block text-stone-800">${descriptionLabel(tx.description)}</span></td>
+                    <td class="col-desc">${transactionDescHtml(tx)}</td>
                     <td class="col-actions">
                         <div class="flex justify-end">
                             <button type="button" data-edit="${tx.id}" title="تعديل" aria-label="تعديل"
@@ -732,15 +883,17 @@
             const badge = categoryBadgeHtml(tx);
             return `
                 <div class="tx-feed-item" data-id="${tx.id}" role="button" tabindex="0">
-                    <div class="flex justify-between items-start gap-3">
-                        <span class="num font-semibold text-base shrink-0 ${amountClass}">${fmt(tx.amount)}</span>
-                        <div class="min-w-0 flex-1 text-left">
-                            <div class="font-medium text-stone-900 leading-snug break-words">${descriptionLabel(tx.description)}</div>
-                            ${badge ? `<div class="mt-1">${badge}</div>` : ''}
+                    <div class="tx-feed-row">
+                        <div class="tx-feed-desc">
+                            <div class="font-medium text-stone-900 leading-snug break-words">${transactionTitleHtml(tx)}</div>
+                        </div>
+                        <div class="tx-feed-amount-col">
+                            <span class="tx-feed-amount num font-semibold text-base ${amountClass}">${fmt(tx.amount)}</span>
+                            ${badge ? `<div class="tx-feed-meta">${badge}</div>` : ''}
                         </div>
                     </div>
-                    <div class="flex justify-between items-center gap-3 mt-1 text-xs text-stone-400">
-                        <span class="num">${fmtDate(tx.transaction_date)}</span>
+                    <div class="tx-feed-footer mt-1 text-xs text-stone-400">
+                        <span class="tx-feed-footer-date num">${fmtDate(tx.transaction_date)}</span>
                         <span class="num">رصيد ${fmtBalance(tx.running_balance)}</span>
                     </div>
                 </div>`;
@@ -845,6 +998,14 @@
                     return;
                 }
                 payload.category_id = selectedAddCategoryId;
+            } else {
+                const sale = sheepSalePayload(false);
+                if (sale.error) {
+                    showToast(sale.error, 'error');
+                    return;
+                }
+                payload.sheep_sale = sale.sheep_sale;
+                payload.sold_sheep_tag_id = sale.sold_sheep_tag_id;
             }
             try {
                 const res = await fetch('/api/budget/transactions', {
@@ -857,7 +1018,10 @@
                 if (result.success !== false) {
                     document.getElementById('amount').value = '';
                     document.getElementById('description').value = '';
+                    document.getElementById('sheepSaleCheck').checked = false;
+                    updateSheepSalePickerVisibility(false);
                     fetchTransactions();
+                    fetchSheepList();
                 }
             } catch {
                 showToast('تعذر الحفظ', 'error');
@@ -871,6 +1035,10 @@
             document.getElementById('editDescription').value = tx.description;
             setType(tx.amount >= 0 ? 'in' : 'out', true);
             setEditCategory(tx.category_id || defaultCategoryId());
+            document.getElementById('editSheepSaleCheck').checked = Boolean(tx.sold_sheep_tag_id);
+            populateSheepSelects(tx.sold_sheep_tag_id || '');
+            document.getElementById('editSoldSheepTag').value = tx.sold_sheep_tag_id || '';
+            updateSheepSalePickerVisibility(true);
             document.getElementById('editModal').classList.remove('hidden');
         }
 
@@ -903,6 +1071,13 @@
                 payload.category_id = selectedEditCategoryId;
             } else {
                 payload.category_id = null;
+                const sale = sheepSalePayload(true);
+                if (sale.error) {
+                    showToast(sale.error, 'error');
+                    return;
+                }
+                payload.sheep_sale = sale.sheep_sale;
+                payload.sold_sheep_tag_id = sale.sold_sheep_tag_id;
             }
             try {
                 const res = await fetch(`/api/budget/transactions/${id}`, {
@@ -915,6 +1090,7 @@
                 if (result.success !== false) {
                     closeEdit();
                     fetchTransactions();
+                    fetchSheepList();
                 }
             } catch {
                 showToast('تعذر التحديث', 'error');
@@ -930,6 +1106,7 @@
                 if (result.success !== false) {
                     if (fromModal) closeEdit();
                     fetchTransactions();
+                    fetchSheepList();
                 }
             } catch {
                 showToast('تعذر الحذف', 'error');
@@ -964,6 +1141,9 @@
             applyFiltersAndRender();
         });
 
+        document.getElementById('sheepSaleCheck').addEventListener('change', () => updateSheepSalePickerVisibility(false));
+        document.getElementById('editSheepSaleCheck').addEventListener('change', () => updateSheepSalePickerVisibility(true));
+
         document.getElementById('filterToggle').addEventListener('click', () => toggleFilterPanel());
         document.getElementById('clearFilters').addEventListener('click', clearFilters);
         document.getElementById('filterDateFrom').addEventListener('change', applyFiltersAndRender);
@@ -977,6 +1157,7 @@
         });
 
         fetchTransactions();
+        fetchSheepList();
     </script>
 </body>
 </html>

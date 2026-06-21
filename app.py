@@ -48,7 +48,7 @@ def init_db():
             notes TEXT,
             mother_status TEXT,
             mother_id TEXT,
-            life_status TEXT,
+            status TEXT,
             pregnancy_status TEXT
         )
     ''')
@@ -60,13 +60,11 @@ def init_db():
         cursor.execute("ALTER TABLE sheep ADD COLUMN mother_status TEXT")
     if 'mother_id' not in columns:
         cursor.execute("ALTER TABLE sheep ADD COLUMN mother_id TEXT")
-    if 'life_status' not in columns:
-        cursor.execute("ALTER TABLE sheep ADD COLUMN life_status TEXT")
     if 'pregnancy_status' not in columns:
         cursor.execute("ALTER TABLE sheep ADD COLUMN pregnancy_status TEXT")
     if 'photo_filename' not in columns:
         cursor.execute("ALTER TABLE sheep ADD COLUMN photo_filename TEXT")
-    ensure_upload_folder()
+    migrate_sheep_status_column(cursor)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS matings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -105,7 +103,8 @@ def init_db():
         cursor.execute("ALTER TABLE ultrasounds ADD COLUMN fetus_count INTEGER")
     cursor.execute("UPDATE sheep SET mother_status = 'أم' WHERE mother_status = 'آم'")
     cursor.execute("UPDATE sheep SET mother_status = 'ليس أم بعد' WHERE mother_status IN ('ليس ام بعد', 'غير محدد') OR mother_status IS NULL OR mother_status = ''")
-    cursor.execute("UPDATE sheep SET life_status = 'حي' WHERE life_status IS NULL OR life_status = ''")
+    cursor.execute("UPDATE sheep SET status = 'حي' WHERE status IS NULL OR status = ''")
+    ensure_upload_folder()
     sync_all_mother_statuses(cursor)
     sync_all_pregnancy_statuses(cursor)
     cursor.execute(
@@ -134,10 +133,76 @@ def init_db():
     budget_columns = {row[1] for row in cursor.fetchall()}
     if 'category_id' not in budget_columns:
         cursor.execute("ALTER TABLE budget_transactions ADD COLUMN category_id INTEGER REFERENCES budget_categories(id) ON DELETE SET NULL")
+    if 'sold_sheep_tag_id' not in budget_columns:
+        cursor.execute("ALTER TABLE budget_transactions ADD COLUMN sold_sheep_tag_id TEXT REFERENCES sheep(tag_id) ON DELETE SET NULL")
     seed_budget_categories(cursor)
     remove_budget_category_by_name(cursor, 'صيانة')
     conn.commit()
     conn.close()
+
+def migrate_sheep_status_column(cursor):
+    cursor.execute("PRAGMA table_info(sheep)")
+    columns = {row[1] for row in cursor.fetchall()}
+    if 'status' in columns:
+        cursor.execute("UPDATE sheep SET status = 'حي' WHERE status IS NULL OR status = ''")
+        return
+    if 'life_status' in columns:
+        cursor.execute("ALTER TABLE sheep RENAME COLUMN life_status TO status")
+    else:
+        cursor.execute("ALTER TABLE sheep ADD COLUMN status TEXT")
+    cursor.execute("UPDATE sheep SET status = 'حي' WHERE status IS NULL OR status = ''")
+
+def parse_sheep_status(value):
+    status = (value or '').strip() or 'حي'
+    if status not in ('حي', 'ميت', 'مباع'):
+        return None
+    return status
+
+def revert_sheep_if_sold(cursor, tag_id):
+    if not tag_id:
+        return
+    cursor.execute(
+        "UPDATE sheep SET status = 'حي' WHERE tag_id = ? AND status = 'مباع'",
+        (tag_id,),
+    )
+    sync_pregnancy_status(cursor, tag_id)
+
+def mark_sheep_as_sold(cursor, tag_id):
+    cursor.execute("SELECT status FROM sheep WHERE tag_id = ?", (tag_id,))
+    row = cursor.fetchone()
+    if not row:
+        return False, f"رقم الخروف '{tag_id}' غير موجود في السجل."
+    if row[0] == 'مباع':
+        return False, 'هذا الخروف مباع مسبقاً.'
+    if row[0] == 'ميت':
+        return False, 'لا يمكن تسجيل بيع لخروف ميت.'
+    cursor.execute("UPDATE sheep SET status = ? WHERE tag_id = ?", ('مباع', tag_id))
+    sync_pregnancy_status(cursor, tag_id)
+    return True, None
+
+def parse_income_sheep_sale(data, amount):
+    if amount <= 0:
+        return None, None
+    if not data.get('sheep_sale'):
+        return None, None
+    tag_id, tag_error = normalize_tag_id(data.get('sold_sheep_tag_id', ''))
+    if tag_error:
+        return None, tag_error
+    if not tag_id:
+        return None, 'الرجاء اختيار رقم الخروف المباع.'
+    return tag_id, None
+
+def sync_budget_sheep_sale(cursor, old_tag, new_tag):
+    if old_tag and old_tag != new_tag:
+        revert_sheep_if_sold(cursor, old_tag)
+    if not new_tag:
+        return None
+    ok, message = mark_sheep_as_sold(cursor, new_tag)
+    if not ok:
+        if old_tag and old_tag != new_tag:
+            mark_sheep_as_sold(cursor, old_tag)
+        return message
+    return None
 
 def now_iso():
     return datetime.now().isoformat(timespec='seconds')
@@ -210,7 +275,7 @@ def sheep_row_to_dict(row, matings=None):
         "notes": row[8],
         "mother_status": row[9],
         "mother_id": row[10],
-        "life_status": row[11],
+        "status": row[11],
         "child_count": row[12],
         "pregnancy_status": row[13] or 'غير حامل',
         "photo_url": f"/uploads/sheep/{row[14]}" if row[14] else None,
@@ -224,7 +289,7 @@ def sheep_row_to_dict(row, matings=None):
 SHEEP_SELECT = """
     SELECT tag_id, name, breed, sheep_type, birth_date, purchase_date,
            purchase_price, purchase_location, notes,
-           mother_status, mother_id, life_status,
+           mother_status, mother_id, status,
            (SELECT COUNT(*) FROM sheep c WHERE c.mother_id = sheep.tag_id) AS child_count,
            pregnancy_status, photo_filename
     FROM sheep
@@ -277,11 +342,11 @@ def validate_latest_active_mating(cursor, mating_id):
 
 def compute_pregnancy_status(cursor, tag_id):
     cursor.execute(
-        "SELECT sheep_type, life_status FROM sheep WHERE tag_id = ?",
+        "SELECT sheep_type, status FROM sheep WHERE tag_id = ?",
         (tag_id,),
     )
     row = cursor.fetchone()
-    if not row or row[0] != 'حملة' or row[1] == 'ميت':
+    if not row or row[0] != 'حملة' or row[1] != 'حي':
         return 'غير حامل'
 
     cursor.execute('''
@@ -394,7 +459,7 @@ def get_sheep_or_404(cursor, tag_id):
 
 def validate_ewe_for_mating(cursor, tag_id):
     cursor.execute(
-        "SELECT sheep_type, life_status FROM sheep WHERE tag_id = ?",
+        "SELECT sheep_type, status FROM sheep WHERE tag_id = ?",
         (tag_id,),
     )
     row = cursor.fetchone()
@@ -402,8 +467,8 @@ def validate_ewe_for_mating(cursor, tag_id):
         return False, f"رقم الخروف '{tag_id}' غير موجود في السجل."
     if row[0] != 'حملة':
         return False, "التلقيح متاح للحملات فقط."
-    if row[1] == 'ميت':
-        return False, "لا يمكن تسجيل تلقيح لخروف ميت."
+    if row[1] != 'حي':
+        return False, "لا يمكن تسجيل تلقيح إلا للحملات الأحياء."
     return True, None
 
 def get_mating_or_404(cursor, mating_id):
@@ -467,7 +532,9 @@ def add_sheep():
     purchase_location = data.get('purchase_location', '').strip()
     notes = data.get('notes', '').strip()
     mother_id = to_western_digits(data.get('mother_id', '')).strip()
-    life_status = data.get('life_status', '').strip() or 'حي'
+    status = parse_sheep_status(data.get('status') or data.get('life_status'))
+    if status is None:
+        return jsonify({"success": False, "message": "الحالة يجب أن تكون حي أو ميت أو مباع."}), 400
 
     if not tag_id:
         return jsonify({"success": False, "message": "الرجاء إدخال رقم الخروف الحتمي."}), 400
@@ -493,9 +560,9 @@ def add_sheep():
                 return jsonify({"success": False, "message": f"رقم الأم '{mother_id}' غير موجود في السجل."}), 400
 
         cursor.execute('''
-            INSERT INTO sheep (tag_id, name, breed, sheep_type, birth_date, purchase_date, purchase_price, purchase_location, notes, mother_status, mother_id, life_status, pregnancy_status)
+            INSERT INTO sheep (tag_id, name, breed, sheep_type, birth_date, purchase_date, purchase_price, purchase_location, notes, mother_status, mother_id, status, pregnancy_status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (tag_id, name, breed, sheep_type, birth_date, purchase_date, purchase_price, purchase_location, notes, 'ليس أم بعد', mother_id or None, life_status, 'غير حامل'))
+        ''', (tag_id, name, breed, sheep_type, birth_date, purchase_date, purchase_price, purchase_location, notes, 'ليس أم بعد', mother_id or None, status, 'غير حامل'))
         sync_mother_status(cursor, tag_id)
         sync_mother_status(cursor, mother_id)
         if mother_id:
@@ -521,7 +588,9 @@ def update_sheep(tag_id):
     purchase_location = data.get('purchase_location', '').strip()
     notes = data.get('notes', '').strip()
     mother_id = to_western_digits(data.get('mother_id', '')).strip()
-    life_status = data.get('life_status', '').strip() or 'حي'
+    status = parse_sheep_status(data.get('status') or data.get('life_status'))
+    if status is None:
+        return jsonify({"success": False, "message": "الحالة يجب أن تكون حي أو ميت أو مباع."}), 400
 
     if mother_id == tag_id:
         return jsonify({"success": False, "message": "لا يمكن أن يكون الخروف أمّاً لنفسه."}), 400
@@ -554,9 +623,9 @@ def update_sheep(tag_id):
 
         cursor.execute('''
             UPDATE sheep
-            SET name=?, breed=?, sheep_type=?, birth_date=?, purchase_date=?, purchase_price=?, purchase_location=?, notes=?, mother_id=?, life_status=?
+            SET name=?, breed=?, sheep_type=?, birth_date=?, purchase_date=?, purchase_price=?, purchase_location=?, notes=?, mother_id=?, status=?
             WHERE tag_id=?
-        ''', (name, breed, sheep_type, birth_date, purchase_date, purchase_price, purchase_location, notes, new_mother_id, life_status, tag_id))
+        ''', (name, breed, sheep_type, birth_date, purchase_date, purchase_price, purchase_location, notes, new_mother_id, status, tag_id))
         sync_mother_status(cursor, tag_id)
         sync_mother_status(cursor, new_mother_id)
         if old_mother_id and old_mother_id != new_mother_id:
@@ -954,7 +1023,8 @@ def budget_row_to_dict(row, running_balance=None):
         "description": row[3] or '',
         "category_id": row[4],
         "category_name": row[5] or '',
-        "created_at": row[6],
+        "sold_sheep_tag_id": row[6],
+        "created_at": row[7],
         "running_balance": running_balance,
     }
 
@@ -1042,7 +1112,7 @@ def get_budget_transactions():
     categories = fetch_budget_categories(cursor)
     cursor.execute('''
         SELECT t.id, t.transaction_date, t.amount, t.description, t.category_id,
-               c.name, t.created_at
+               c.name, t.sold_sheep_tag_id, t.created_at
         FROM budget_transactions t
         LEFT JOIN budget_categories c ON c.id = t.category_id
         ORDER BY t.transaction_date ASC, t.id ASC
@@ -1078,10 +1148,21 @@ def add_budget_transaction():
         if category_error:
             conn.close()
             return jsonify({"success": False, "message": category_error}), 400
+
+        sold_tag, sale_error = parse_income_sheep_sale(data, amount)
+        if sale_error:
+            conn.close()
+            return jsonify({"success": False, "message": sale_error}), 400
+        if sold_tag:
+            ok, message = mark_sheep_as_sold(cursor, sold_tag)
+            if not ok:
+                conn.close()
+                return jsonify({"success": False, "message": message}), 400
+
         cursor.execute(
-            "INSERT INTO budget_transactions (transaction_date, amount, description, category_id, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (transaction_date, round(amount, 2), description, category_id, now_iso()),
+            "INSERT INTO budget_transactions (transaction_date, amount, description, category_id, sold_sheep_tag_id, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (transaction_date, round(amount, 2), description, category_id, sold_tag, now_iso()),
         )
         conn.commit()
         new_id = cursor.lastrowid
@@ -1097,6 +1178,8 @@ def update_budget_transaction(transaction_id):
     description = data.get('description')
     amount_raw = data.get('amount')
     category_id_raw = data.get('category_id')
+    sheep_sale_raw = data.get('sheep_sale')
+    sold_sheep_tag_raw = data.get('sold_sheep_tag_id')
 
     if transaction_date is not None:
         transaction_date = transaction_date.strip()
@@ -1121,9 +1204,15 @@ def update_budget_transaction(transaction_id):
             conn.close()
             return jsonify({"success": False, "message": "الحركة غير موجودة."}), 404
 
-        cursor.execute("SELECT amount FROM budget_transactions WHERE id = ?", (transaction_id,))
+        cursor.execute(
+            "SELECT amount, sold_sheep_tag_id FROM budget_transactions WHERE id = ?",
+            (transaction_id,),
+        )
         current_row = cursor.fetchone()
-        current_amount = current_row[0] if current_row else 0
+        if not current_row:
+            conn.close()
+            return jsonify({"success": False, "message": "الحركة غير موجودة."}), 404
+        current_amount, old_sold_tag = current_row
         new_amount = amount if amount is not None else current_amount
 
         category_id = None
@@ -1142,6 +1231,37 @@ def update_budget_transaction(transaction_id):
                         conn.close()
                         return jsonify({"success": False, "message": category_error}), 400
 
+        sale_touched = (
+            sheep_sale_raw is not None
+            or sold_sheep_tag_raw is not None
+            or amount is not None
+        )
+        new_sold_tag = old_sold_tag
+        if sale_touched:
+            if new_amount < 0:
+                if old_sold_tag:
+                    revert_sheep_if_sold(cursor, old_sold_tag)
+                new_sold_tag = None
+            else:
+                wants_sale = sheep_sale_raw if sheep_sale_raw is not None else bool(old_sold_tag)
+                if wants_sale:
+                    sale_data = {
+                        'sheep_sale': True,
+                        'sold_sheep_tag_id': sold_sheep_tag_raw if sold_sheep_tag_raw is not None else old_sold_tag,
+                    }
+                    parsed_tag, sale_error = parse_income_sheep_sale(sale_data, new_amount)
+                    if sale_error:
+                        conn.close()
+                        return jsonify({"success": False, "message": sale_error}), 400
+                    new_sold_tag = parsed_tag
+                else:
+                    new_sold_tag = None
+                sale_error = sync_budget_sheep_sale(cursor, old_sold_tag, new_sold_tag)
+                if sale_error:
+                    conn.rollback()
+                    conn.close()
+                    return jsonify({"success": False, "message": sale_error}), 400
+
         updates = []
         values = []
         if transaction_date is not None:
@@ -1156,6 +1276,9 @@ def update_budget_transaction(transaction_id):
         if category_touched:
             updates.append("category_id = ?")
             values.append(category_id)
+        if sale_touched:
+            updates.append("sold_sheep_tag_id = ?")
+            values.append(new_sold_tag)
 
         if not updates:
             conn.close()
@@ -1178,10 +1301,22 @@ def delete_budget_transaction(transaction_id):
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(
+            "SELECT sold_sheep_tag_id FROM budget_transactions WHERE id = ?",
+            (transaction_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"success": False, "message": "الحركة غير موجودة."}), 404
+        sold_tag = row[0]
+        if sold_tag:
+            revert_sheep_if_sold(cursor, sold_tag)
+        cursor.execute(
             "DELETE FROM budget_transactions WHERE id = ?",
             (transaction_id,),
         )
         if cursor.rowcount == 0:
+            conn.rollback()
             conn.close()
             return jsonify({"success": False, "message": "الحركة غير موجودة."}), 404
         conn.commit()
