@@ -260,6 +260,14 @@
                     <input type="text" id="name" class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
                 </div>
                 <div>
+                    <label class="block text-sm font-medium mb-1 text-stone-700">صورة الخروف</label>
+                    <input type="file" id="sheep_photo" accept="image/jpeg,image/png,image/webp,image/gif" class="w-full text-sm text-stone-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-lime-50 file:text-lime-700 file:font-medium hover:file:bg-lime-100">
+                    <div id="photoPreview" class="hidden mt-3 relative">
+                        <img id="photoPreviewImg" alt="معاينة الصورة" class="w-full max-h-48 object-cover rounded-lg border border-stone-200">
+                        <button type="button" id="clearPhotoBtn" class="absolute top-2 left-2 bg-white/90 hover:bg-white text-stone-600 text-xs font-medium px-2 py-1 rounded-md border border-stone-200 shadow-sm transition">إزالة</button>
+                    </div>
+                </div>
+                <div>
                     <label class="block text-sm font-medium mb-1 text-stone-700">ملاحظات اضافية</label>
                     <textarea id="notes" rows="4" placeholder="أدخل الملاحظات هنا..." class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500 text-sm resize-none"></textarea>
                 </div>
@@ -352,6 +360,9 @@
         let activeSonarFilter = '';
         let filtersExpanded = false;
         let expandedCards = new Set();
+        let pendingPhotoFile = null;
+        let removeExistingPhoto = false;
+        let existingPhotoUrl = null;
 
         const LIFE_FILTER_OPTIONS = [
             { value: '', label: 'الكل' },
@@ -403,7 +414,66 @@
                 radio.addEventListener('change', updatePurchaseFieldsVisibility);
             });
             updatePurchaseFieldsVisibility();
+            document.getElementById('sheep_photo').addEventListener('change', handlePhotoSelect);
+            document.getElementById('clearPhotoBtn').addEventListener('click', clearPhotoSelection);
         });
+
+        function handlePhotoSelect(e) {
+            const file = e.target.files[0];
+            if (!file) {
+                clearPhotoSelection();
+                return;
+            }
+            pendingPhotoFile = file;
+            removeExistingPhoto = false;
+            const reader = new FileReader();
+            reader.onload = () => {
+                document.getElementById('photoPreviewImg').src = reader.result;
+                document.getElementById('photoPreview').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearPhotoSelection() {
+            const hadNewSelection = Boolean(pendingPhotoFile);
+            pendingPhotoFile = null;
+            document.getElementById('sheep_photo').value = '';
+            if (existingPhotoUrl && !hadNewSelection) {
+                removeExistingPhoto = true;
+                document.getElementById('photoPreview').classList.add('hidden');
+                document.getElementById('photoPreviewImg').src = '';
+            } else if (existingPhotoUrl && hadNewSelection) {
+                removeExistingPhoto = false;
+                showPhotoPreview(existingPhotoUrl);
+            } else {
+                removeExistingPhoto = false;
+                document.getElementById('photoPreview').classList.add('hidden');
+                document.getElementById('photoPreviewImg').src = '';
+            }
+        }
+
+        function showPhotoPreview(url) {
+            if (!url) return;
+            document.getElementById('photoPreviewImg').src = url;
+            document.getElementById('photoPreview').classList.remove('hidden');
+        }
+
+        async function uploadSheepPhoto(tagId, file) {
+            const formData = new FormData();
+            formData.append('photo', file);
+            const response = await fetch(`/api/sheep/${encodeURIComponent(tagId)}/photo`, {
+                method: 'POST',
+                body: formData,
+            });
+            return response.json();
+        }
+
+        async function deleteSheepPhoto(tagId) {
+            const response = await fetch(`/api/sheep/${encodeURIComponent(tagId)}/photo`, {
+                method: 'DELETE',
+            });
+            return response.json();
+        }
 
         function escapeHtml(str) {
             if (!str) return '';
@@ -568,6 +638,8 @@
             const status = pregnancyStatusLabel(sheep);
             const statusBadge = `<span class="text-xs font-medium px-2 py-0.5 rounded-full ${reproStatusClass(status)}">${escapeHtml(status)}</span>`;
 
+            const activeMating = getActiveMating(sheep);
+
             let matingsHtml = '';
             if (matings.length === 0) {
                 matingsHtml = '<p class="text-sm text-stone-500">لا توجد سجلات تلقيح بعد</p>';
@@ -575,13 +647,15 @@
                 matingsHtml = matings.map(m => {
                     const typeBadge = `<span class="text-xs font-medium px-2 py-0.5 rounded-full ${matingTypeClass(m.mating_type)}">${escapeHtml(matingTypeLabel(m.mating_type))}</span>`;
                     const completedLine = m.completed_at ? `<p class="text-xs text-stone-400 mt-1.5">دورة مغلقة</p>` : '';
+                    const isActiveMating = activeMating && m.id === activeMating.id;
+                    const hasPassUltrasound = (m.ultrasounds || []).some(u => u.result === 'pass');
 
                     let actionsHtml = '';
-                    if (!m.completed_at) {
+                    if (isActiveMating) {
                         actionsHtml = `
                             <div class="flex flex-wrap gap-2 mt-2 justify-end">
                                 <button data-action="add-ultrasound" data-id="${m.id}" data-tag="${safeTag}" class="text-xs font-semibold px-2.5 py-1 rounded-md bg-violet-600 text-white hover:bg-violet-700 transition">+ سونار</button>
-                                ${status === 'حامل' ? `<button data-action="complete-mating" data-id="${m.id}" class="text-xs font-medium px-2.5 py-1 rounded-md text-stone-600 hover:bg-stone-100 transition">إغلاق الدورة</button>` : ''}
+                                ${hasPassUltrasound ? `<button data-action="complete-mating" data-id="${m.id}" class="text-xs font-medium px-2.5 py-1 rounded-md text-stone-600 hover:bg-stone-100 transition">إغلاق الدورة</button>` : ''}
                             </div>`;
                     }
 
@@ -664,7 +738,10 @@
         }
 
         function getActiveMating(sheep) {
-            return (sheep.matings || []).find(m => !m.completed_at) || null;
+            const matings = sheep.matings || [];
+            if (!matings.length) return null;
+            const latest = matings[0];
+            return latest.completed_at ? null : latest;
         }
 
         function getActiveCycleMatingDate(sheep) {
@@ -1218,6 +1295,7 @@
                 const reproSection = renderReproductionSection(s);
                 const expandedBody = `
                     <div class="space-y-4 min-w-0">
+                        ${s.photo_url ? `<img src="${escapeHtml(s.photo_url)}" alt="صورة الخروف ${safeTag}" class="w-full max-h-56 object-cover rounded-lg border border-stone-200">` : ''}
                         ${detailsRows}
                         ${purchaseRows ? `<div class="bg-white rounded-lg p-3 border border-stone-200">${purchaseRows}</div>` : ''}
                         ${reproSection}
@@ -1410,6 +1488,16 @@
             document.getElementById('purchase_location').value = sheep.purchase_location || '';
             updatePurchaseFieldsVisibility();
             document.getElementById('notes').value = sheep.notes || '';
+            existingPhotoUrl = sheep.photo_url || null;
+            pendingPhotoFile = null;
+            removeExistingPhoto = false;
+            document.getElementById('sheep_photo').value = '';
+            if (existingPhotoUrl) {
+                showPhotoPreview(existingPhotoUrl);
+            } else {
+                document.getElementById('photoPreview').classList.add('hidden');
+                document.getElementById('photoPreviewImg').src = '';
+            }
 
             document.getElementById('formMode').value = 'UPDATE';
             document.getElementById('formTitle').innerText = `تعديل الخروف (${tagId})`;
@@ -1428,6 +1516,12 @@
             document.getElementById('birth_date').value = todayDateString();
             populateMotherOptions();
             setSheepOrigin('farm');
+            pendingPhotoFile = null;
+            removeExistingPhoto = false;
+            existingPhotoUrl = null;
+            document.getElementById('sheep_photo').value = '';
+            document.getElementById('photoPreview').classList.add('hidden');
+            document.getElementById('photoPreviewImg').src = '';
             document.getElementById('formMode').value = 'CREATE';
             document.getElementById('formTitle').innerText = 'تسجيل رأس جديد';
             document.getElementById('formTitle').className = 'text-lg font-bold text-lime-700';
@@ -1572,7 +1666,25 @@
                 const result = await response.json();
 
                 if (result.success) {
+                    const savedTagId = mode === 'UPDATE' ? tagId : tagId;
+                    let photoMessage = null;
+
+                    if (pendingPhotoFile) {
+                        const photoResult = await uploadSheepPhoto(savedTagId, pendingPhotoFile);
+                        if (photoResult.success === false) {
+                            photoMessage = photoResult.message;
+                        }
+                    } else if (removeExistingPhoto && mode === 'UPDATE') {
+                        const photoResult = await deleteSheepPhoto(savedTagId);
+                        if (photoResult.success === false) {
+                            photoMessage = photoResult.message;
+                        }
+                    }
+
                     showToast(result.message, 'success');
+                    if (photoMessage) {
+                        showToast(photoMessage, 'error');
+                    }
                     closeFormPanel();
                     resetFormState();
                     fetchSheep();

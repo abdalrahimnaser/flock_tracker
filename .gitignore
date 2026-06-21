@@ -1,5 +1,6 @@
 .venv/
 farm_data.db
+uploads/
 __pycache__/
 *.pyc
 *.pyo

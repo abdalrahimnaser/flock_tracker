@@ -1,10 +1,28 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
+import os
 import sqlite3
 from datetime import date, datetime, timedelta
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 DB_NAME = "farm_data.db"
 MATING_REVIEW_DAYS = 20
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'sheep')
+ALLOWED_PHOTO_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp', 'gif'}
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
+
+def ensure_upload_folder():
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+def allowed_photo(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_PHOTO_EXTENSIONS
+
+def delete_sheep_photo_file(filename):
+    if not filename:
+        return
+    path = os.path.join(UPLOAD_FOLDER, filename)
+    if os.path.isfile(path):
+        os.remove(path)
 
 def get_connection():
     conn = sqlite3.connect(DB_NAME)
@@ -46,6 +64,9 @@ def init_db():
         cursor.execute("ALTER TABLE sheep ADD COLUMN life_status TEXT")
     if 'pregnancy_status' not in columns:
         cursor.execute("ALTER TABLE sheep ADD COLUMN pregnancy_status TEXT")
+    if 'photo_filename' not in columns:
+        cursor.execute("ALTER TABLE sheep ADD COLUMN photo_filename TEXT")
+    ensure_upload_folder()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS matings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -148,6 +169,7 @@ def sheep_row_to_dict(row, matings=None):
         "life_status": row[11],
         "child_count": row[12],
         "pregnancy_status": row[13] or 'غير حامل',
+        "photo_url": f"/uploads/sheep/{row[14]}" if row[14] else None,
         "matings": matings or [],
         "needs_mating_review": any(
             mating_needs_review(m.get('mated_date'), m.get('completed_at'), m.get('ultrasounds'))
@@ -160,7 +182,7 @@ SHEEP_SELECT = """
            purchase_price, purchase_location, notes,
            mother_status, mother_id, life_status,
            (SELECT COUNT(*) FROM sheep c WHERE c.mother_id = sheep.tag_id) AS child_count,
-           pregnancy_status
+           pregnancy_status, photo_filename
     FROM sheep
 """
 
@@ -189,6 +211,26 @@ def sync_all_mother_statuses(cursor):
     for (tag_id,) in cursor.fetchall():
         sync_mother_status(cursor, tag_id)
 
+def get_latest_mating_id(cursor, sheep_tag_id):
+    cursor.execute('''
+        SELECT id FROM matings
+        WHERE sheep_tag_id = ?
+        ORDER BY mated_date DESC, id DESC
+        LIMIT 1
+    ''', (sheep_tag_id,))
+    row = cursor.fetchone()
+    return row[0] if row else None
+
+def validate_latest_active_mating(cursor, mating_id):
+    row = get_mating_or_404(cursor, mating_id)
+    if not row:
+        return None, "سجل التلقيح غير موجود."
+    if row[5] is not None:
+        return None, "تم إغلاق دورة هذا التلقيح."
+    if get_latest_mating_id(cursor, row[1]) != mating_id:
+        return None, "يمكن التعديل على آخر سجل تلقيح فقط."
+    return row, None
+
 def compute_pregnancy_status(cursor, tag_id):
     cursor.execute(
         "SELECT sheep_type, life_status FROM sheep WHERE tag_id = ?",
@@ -199,14 +241,14 @@ def compute_pregnancy_status(cursor, tag_id):
         return 'غير حامل'
 
     cursor.execute('''
-        SELECT m.id
+        SELECT m.id, m.completed_at
         FROM matings m
-        WHERE m.sheep_tag_id = ? AND m.completed_at IS NULL
+        WHERE m.sheep_tag_id = ?
         ORDER BY m.mated_date DESC, m.id DESC
         LIMIT 1
     ''', (tag_id,))
     mating = cursor.fetchone()
-    if not mating:
+    if not mating or mating[1] is not None:
         return 'غير حامل'
 
     mating_id = mating[0]
@@ -482,15 +524,75 @@ def update_sheep(tag_id):
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
+@app.route('/uploads/sheep/<path:filename>')
+def serve_sheep_photo(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename)
+
+@app.route('/api/sheep/<tag_id>/photo', methods=['POST'])
+def upload_sheep_photo(tag_id):
+    """Upload or replace a sheep photo."""
+    file = request.files.get('photo')
+    if not file or not file.filename:
+        return jsonify({"success": False, "message": "الرجاء اختيار صورة."}), 400
+    if not allowed_photo(file.filename):
+        return jsonify({"success": False, "message": "نوع الملف غير مدعوم. استخدم JPG أو PNG أو WEBP."}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT photo_filename FROM sheep WHERE tag_id = ?", (tag_id,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"success": False, "message": f"رقم الخروف '{tag_id}' غير موجود في السجل."}), 404
+
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        safe_tag = secure_filename(tag_id) or 'sheep'
+        filename = f"{safe_tag}.{ext}"
+        delete_sheep_photo_file(row[0])
+        ensure_upload_folder()
+        file.save(os.path.join(UPLOAD_FOLDER, filename))
+        cursor.execute("UPDATE sheep SET photo_filename = ? WHERE tag_id = ?", (filename, tag_id))
+        conn.commit()
+        conn.close()
+        return jsonify({
+            "success": True,
+            "message": "تم رفع الصورة بنجاح!",
+            "photo_url": f"/uploads/sheep/{filename}",
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/sheep/<tag_id>/photo', methods=['DELETE'])
+def delete_sheep_photo(tag_id):
+    """Remove a sheep photo."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT photo_filename FROM sheep WHERE tag_id = ?", (tag_id,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"success": False, "message": f"رقم الخروف '{tag_id}' غير موجود في السجل."}), 404
+        delete_sheep_photo_file(row[0])
+        cursor.execute("UPDATE sheep SET photo_filename = NULL WHERE tag_id = ?", (tag_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "تم حذف الصورة."})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
 @app.route('/api/sheep/<tag_id>', methods=['DELETE'])
 def delete_sheep(tag_id):
     """Deletes a sheep record matching the tag_id."""
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT mother_id FROM sheep WHERE tag_id = ?", (tag_id,))
+        cursor.execute("SELECT mother_id, photo_filename FROM sheep WHERE tag_id = ?", (tag_id,))
         row = cursor.fetchone()
         mother_id = row[0] if row else None
+        if row and row[1]:
+            delete_sheep_photo_file(row[1])
         delete_reproduction_for_sheep(cursor, tag_id)
         cursor.execute("DELETE FROM sheep WHERE tag_id=?", (tag_id,))
         sync_mother_status(cursor, mother_id)
@@ -521,6 +623,11 @@ def add_mating(tag_id):
         if not ok:
             conn.close()
             return jsonify({"success": False, "message": message}), 400
+
+        cursor.execute('''
+            UPDATE matings SET completed_at = ?
+            WHERE sheep_tag_id = ? AND completed_at IS NULL
+        ''', (now_iso(), tag_id))
 
         cursor.execute('''
             INSERT INTO matings (sheep_tag_id, mated_date, notes, mating_type, created_at)
@@ -583,13 +690,13 @@ def complete_mating(mating_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        row = get_mating_or_404(cursor, mating_id)
+        row, error = validate_latest_active_mating(cursor, mating_id)
         if not row:
             conn.close()
-            return jsonify({"success": False, "message": "سجل التلقيح غير موجود."}), 404
-        if row[5] is not None:
+            return jsonify({"success": False, "message": error}), 404
+        if error:
             conn.close()
-            return jsonify({"success": False, "message": "تم إغلاق دورة هذا التلقيح."}), 400
+            return jsonify({"success": False, "message": error}), 400
         cursor.execute(
             "SELECT 1 FROM ultrasounds WHERE mating_id = ? AND result = 'pass' LIMIT 1",
             (mating_id,),
@@ -597,10 +704,15 @@ def complete_mating(mating_id):
         if not cursor.fetchone():
             conn.close()
             return jsonify({"success": False, "message": "يمكن إغلاق دورة حمل ناجحة فقط."}), 400
+        completed_at = now_iso()
         cursor.execute(
             "UPDATE matings SET completed_at = ? WHERE id = ?",
-            (now_iso(), mating_id),
+            (completed_at, mating_id),
         )
+        cursor.execute('''
+            UPDATE matings SET completed_at = ?
+            WHERE sheep_tag_id = ? AND completed_at IS NULL AND id != ?
+        ''', (completed_at, row[1], mating_id))
         sync_pregnancy_status(cursor, row[1])
         conn.commit()
         conn.close()
@@ -628,13 +740,13 @@ def add_ultrasound(mating_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        row = get_mating_or_404(cursor, mating_id)
+        row, error = validate_latest_active_mating(cursor, mating_id)
         if not row:
             conn.close()
-            return jsonify({"success": False, "message": "سجل التلقيح غير موجود."}), 404
-        if row[5] is not None:
+            return jsonify({"success": False, "message": error}), 404
+        if error:
             conn.close()
-            return jsonify({"success": False, "message": "تم إغلاق دورة هذا التلقيح."}), 400
+            return jsonify({"success": False, "message": error}), 400
 
         cursor.execute('''
             INSERT INTO ultrasounds (mating_id, scan_date, result, fetus_count, notes, created_at)
