@@ -2129,8 +2129,9 @@ def get_local_ip():
         return None
 
 
+init_db()
+
 if __name__ == '__main__':
-    init_db()
     port = 5001
     use_https = os.environ.get('USE_HTTPS', '0') == '1'
     ssl_context = 'adhoc' if use_https else None
