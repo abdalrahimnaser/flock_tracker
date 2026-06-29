@@ -361,6 +361,7 @@
         let activeSonarFilter = '';
         let filtersExpanded = false;
         let expandedCards = new Set();
+        let expandedReproSections = new Set();
         let pendingPhotoFile = null;
         let removeExistingPhoto = false;
         let existingPhotoUrl = null;
@@ -755,6 +756,38 @@
             `;
         }
 
+        function reproSummaryLine(sheep) {
+            const matings = sheep.matings || [];
+            if (matings.length === 0) return 'لا توجد سجلات تلقيح';
+
+            const active = getActiveMating(sheep);
+            if (active) {
+                const ultrasounds = active.ultrasounds || [];
+                const lastU = ultrasounds[0];
+                let line = `دورة نشطة · تلقيح ${active.mated_date}`;
+                if (lastU) {
+                    line += ` · سونار ${lastU.scan_date} (${lastU.result === 'pass' ? 'ناجح' : 'فاشل'})`;
+                } else {
+                    line += ' · بانتظار سونار';
+                }
+                return line;
+            }
+
+            if (matings.length === 1) {
+                return `سجل واحد · آخر تلقيح ${matings[0].mated_date}`;
+            }
+            return `${matings.length} سجلات · آخر تلقيح ${matings[0].mated_date}`;
+        }
+
+        function toggleReproSection(tagId) {
+            if (expandedReproSections.has(tagId)) {
+                expandedReproSections.delete(tagId);
+            } else {
+                expandedReproSections.add(tagId);
+            }
+            applyFilters();
+        }
+
         function renderReproductionSection(sheep) {
             if (sheep.sheep_type !== 'حملة') return '';
 
@@ -762,6 +795,9 @@
             const matings = sheep.matings || [];
             const status = pregnancyStatusLabel(sheep);
             const statusBadge = `<span class="text-xs font-medium px-2 py-0.5 rounded-full ${reproStatusClass(status)}">${escapeHtml(status)}</span>`;
+            const isReproExpanded = expandedReproSections.has(sheep.tag_id);
+            const summaryLine = reproSummaryLine(sheep);
+            const hasDetails = matings.length > 0;
 
             const activeMating = getActiveMating(sheep);
 
@@ -824,16 +860,25 @@
                 }).join('');
             }
 
+            const toggleBtn = hasDetails ? `
+                <button data-action="toggle-repro" data-tag="${safeTag}"
+                    class="mt-2 w-full flex items-center justify-between gap-2 text-xs font-medium text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-md px-2 py-1.5 transition">
+                    <span class="transition-transform duration-200 ${isReproExpanded ? 'rotate-180' : ''} text-stone-400">▼</span>
+                    <span>${isReproExpanded ? 'إخفاء التفاصيل' : `عرض التفاصيل (${matings.length})`}</span>
+                </button>` : '';
+
             return `
                 <div class="bg-white rounded-lg p-3 border border-stone-200 h-full">
-                    <div class="flex justify-between items-center gap-2 mb-3">
+                    <div class="flex justify-between items-center gap-2">
                         <div class="text-right flex-1 flex items-center gap-2 flex-wrap justify-start">
                             <div class="text-xs font-bold text-stone-500">التلقيح والحمل</div>
                             ${statusBadge}
                         </div>
                         <button data-action="add-mating" data-tag="${safeTag}" class="text-xs font-semibold px-2.5 py-1 rounded-md bg-lime-600 text-white hover:bg-lime-700 transition shrink-0">+ تلقيح</button>
                     </div>
-                    <div class="space-y-2">${matingsHtml}</div>
+                    <p class="text-sm text-stone-600 mt-2 leading-relaxed">${escapeHtml(summaryLine)}</p>
+                    ${toggleBtn}
+                    <div class="${isReproExpanded ? 'mt-3 space-y-2' : 'hidden'}">${matingsHtml}</div>
                 </div>`;
         }
 
@@ -1457,7 +1502,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="card-details overflow-hidden border-t border-stone-200 ${isExpanded ? 'max-h-[1200px] opacity-100' : 'max-h-0 opacity-0'}">
+                    <div class="card-details border-t border-stone-200 ${isExpanded ? 'max-h-[8000px] overflow-visible opacity-100' : 'max-h-0 overflow-hidden opacity-0'}">
                         <div class="p-4 bg-stone-50 text-right">
                             ${expandedBody}
                         </div>
@@ -1676,6 +1721,7 @@
                     resetFormState();
                 }
                 expandedCards.delete(tagId);
+                expandedReproSections.delete(tagId);
                 fetchSheep();
             } catch (err) {
                 showToast('تعذر تنفيذ عملية الحذف', 'error');
@@ -1753,6 +1799,7 @@
                 else if (action === 'delete-mating') deleteMating(id);
                 else if (action === 'complete-mating') completeMating(id);
                 else if (action === 'delete-ultrasound') deleteUltrasound(id);
+                else if (action === 'toggle-repro') toggleReproSection(tag);
                 return;
             }
             const header = e.target.closest('.card-header');
@@ -1870,6 +1917,7 @@
                 if (result.success !== false) {
                     closeReproModal();
                     expandedCards.add(tagId);
+                    expandedReproSections.add(tagId);
                     fetchSheep();
                 }
             } catch (err) {
