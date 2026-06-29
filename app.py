@@ -2119,6 +2119,33 @@ def delete_vaccination_record(record_id):
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
+def get_local_ip():
+    import socket
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(('8.8.8.8', 80))
+            return sock.getsockname()[0]
+    except OSError:
+        return None
+
+
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    port = 5001
+    use_https = os.environ.get('USE_HTTPS', '0') == '1'
+    ssl_context = 'adhoc' if use_https else None
+    scheme = 'https' if use_https else 'http'
+    local_ip = get_local_ip()
+
+    print('\n--- Farm Logger ---')
+    print(f'  On this Mac:  {scheme}://127.0.0.1:{port}')
+    if local_ip:
+        print(f'  On your phone: {scheme}://{local_ip}:{port}')
+    if use_https:
+        print('  HTTPS is on — accept the certificate warning on your phone.')
+    else:
+        print('  Use http:// (not https://) on other devices.')
+        print('  For camera on phone: USE_HTTPS=1 python app.py')
+    print('-------------------\n')
+
+    app.run(debug=True, host='0.0.0.0', port=port, ssl_context=ssl_context)
