@@ -20,6 +20,40 @@
         .type-btn.selected-in { background: #059669; color: white; border-color: #059669; }
         .type-btn.selected-out { background: #dc2626; color: white; border-color: #dc2626; }
         .num { font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
+        .date-field {
+            min-width: 0;
+            max-width: 100%;
+            overflow: hidden;
+            border-radius: 0.5rem;
+        }
+        input[type="date"].date-input {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            direction: ltr;
+            text-align: right;
+            min-width: 0;
+            max-width: 100%;
+            -webkit-min-logical-width: 0;
+            font-variant-numeric: tabular-nums;
+        }
+        input[type="date"].date-input::-webkit-date-and-time-value {
+            text-align: right;
+            min-width: 0;
+            margin: 0;
+            padding: 0;
+        }
+        input[type="date"].date-input::-webkit-datetime-edit {
+            min-width: 0;
+            padding: 0;
+        }
+        input[type="date"].date-input::-webkit-datetime-edit-fields-wrapper {
+            min-width: 0;
+        }
+        input[type="date"].date-input::-webkit-calendar-picker-indicator {
+            margin-inline-start: 0.25rem;
+            margin-inline-end: 0;
+        }
         .tx-table { width: 100%; border-collapse: collapse; }
         .tx-table thead th {
             padding: 0.75rem 0.875rem;
@@ -182,7 +216,7 @@
 
         <section class="add-form-section bg-white p-3 sm:p-6 rounded-xl shadow-sm border border-stone-200 mb-4 sm:mb-6">
             <h2 class="text-base sm:text-lg font-bold">تسجيل حركة جديدة</h2>
-            <form id="addForm" class="form-stack flex flex-col space-y-3 sm:space-y-4">
+            <form id="addForm" class="form-stack flex flex-col space-y-3 sm:space-y-4 min-w-0 overflow-x-hidden">
                 <div class="flex gap-2">
                     <button type="button" id="btnIncome" data-type="in"
                         class="type-btn flex-1 py-2 sm:py-2.5 rounded-lg border border-stone-200 text-sm font-medium transition hover:border-emerald-400">
@@ -193,16 +227,16 @@
                         مصروف
                     </button>
                 </div>
-                <div class="grid grid-cols-2 sm:grid-cols-2 gap-3 sm:gap-4">
-                    <div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div class="min-w-0">
                         <label class="text-xs font-medium text-stone-500 block mb-1">المبلغ</label>
                         <input type="text" id="amount" inputmode="decimal" lang="en" required placeholder="0.00"
                             class="field-input w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 sm:py-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 num">
                     </div>
-                    <div>
+                    <div class="date-field min-w-0">
                         <label class="text-xs font-medium text-stone-500 block mb-1">التاريخ</label>
-                        <input type="date" id="transactionDate" required
-                            class="field-input w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 sm:py-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
+                        <input type="date" id="transactionDate" lang="en" required
+                            class="date-input field-input w-full min-w-0 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 sm:py-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
                     </div>
                 </div>
                 <div id="addCategoryWrap" class="space-y-1.5 sm:space-y-2">
@@ -298,15 +332,15 @@
                             </div>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
+                            <div class="date-field min-w-0">
                                 <label class="text-xs font-medium text-stone-500 block mb-1">من تاريخ</label>
-                                <input type="date" id="filterDateFrom"
-                                    class="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
+                                <input type="date" id="filterDateFrom" lang="en"
+                                    class="date-input w-full min-w-0 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
                             </div>
-                            <div>
+                            <div class="date-field min-w-0">
                                 <label class="text-xs font-medium text-stone-500 block mb-1">إلى تاريخ</label>
-                                <input type="date" id="filterDateTo"
-                                    class="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
+                                <input type="date" id="filterDateTo" lang="en"
+                                    class="date-input w-full min-w-0 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
                             </div>
                         </div>
                         <div>
@@ -355,10 +389,10 @@
                     <input type="text" id="editAmount" inputmode="decimal" lang="en" required
                         class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 num">
                 </div>
-                <div>
+                <div class="date-field min-w-0">
                     <label class="text-xs font-medium text-stone-500 block mb-1">التاريخ</label>
-                    <input type="date" id="editDate" required
-                        class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
+                    <input type="date" id="editDate" lang="en" required
+                        class="date-input w-full min-w-0 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500">
                 </div>
                 <div id="editCategoryWrap" class="space-y-2 hidden">
                     <label class="text-xs font-medium text-stone-500 block">فئة المصروف *</label>

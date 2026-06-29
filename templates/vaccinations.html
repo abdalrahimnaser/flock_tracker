@@ -18,6 +18,40 @@
             to   { opacity: 0; transform: translateY(1rem); }
         }
         .num { font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
+        .date-field {
+            min-width: 0;
+            max-width: 100%;
+            overflow: hidden;
+            border-radius: 0.5rem;
+        }
+        input[type="date"].date-input {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            direction: ltr;
+            text-align: right;
+            min-width: 0;
+            max-width: 100%;
+            -webkit-min-logical-width: 0;
+            font-variant-numeric: tabular-nums;
+        }
+        input[type="date"].date-input::-webkit-date-and-time-value {
+            text-align: right;
+            min-width: 0;
+            margin: 0;
+            padding: 0;
+        }
+        input[type="date"].date-input::-webkit-datetime-edit {
+            min-width: 0;
+            padding: 0;
+        }
+        input[type="date"].date-input::-webkit-datetime-edit-fields-wrapper {
+            min-width: 0;
+        }
+        input[type="date"].date-input::-webkit-calendar-picker-indicator {
+            margin-inline-start: 0.25rem;
+            margin-inline-end: 0;
+        }
         .filter-panel { transition: max-height 0.25s ease, opacity 0.2s ease, padding 0.25s ease; }
         .filter-panel:not(.expanded) { padding-top: 0; padding-bottom: 0; border-width: 0; }
         .filter-chip.selected { background: #0284c7; color: white; border-color: #0284c7; }
@@ -81,15 +115,15 @@
         <!-- Log vaccination -->
         <section id="sectionLog" class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-stone-200 mb-4">
             <h2 class="text-base sm:text-lg font-bold mb-4">تسجيل تطعيم جديد</h2>
-            <form id="logForm" class="space-y-4">
+            <form id="logForm" class="space-y-4 min-w-0 overflow-x-hidden">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
+                    <div class="min-w-0">
                         <label class="text-xs font-medium text-stone-500 block mb-1">نوع التطعيم *</label>
                         <select id="logType" required class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500"></select>
                     </div>
-                    <div>
+                    <div class="date-field min-w-0">
                         <label class="text-xs font-medium text-stone-500 block mb-1">تاريخ التطعيم</label>
-                        <input type="date" id="logDate" class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                        <input type="date" id="logDate" lang="en" class="date-input w-full min-w-0 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
                     </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -226,8 +260,10 @@
                     </div>
                     <div class="pb-4">
                         <span class="text-xs font-medium text-stone-500 mb-2 block">مستحق التطعيم بحلول تاريخ</span>
-                        <input type="date" id="dueByFilter"
-                            class="bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                        <div class="date-field min-w-0">
+                            <input type="date" id="dueByFilter" lang="en"
+                                class="date-input w-full min-w-0 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                        </div>
                         <p class="text-[11px] text-stone-400 mt-1">يعرض الأغنام التي لديها تطعيم مستحق أو متأخر بحلول هذا التاريخ</p>
                     </div>
                 </div>
@@ -285,6 +321,13 @@
 
         function extractDigits(str) {
             return String(str || '').replace(/\D/g, '');
+        }
+
+        function fmtDate(iso) {
+            if (!iso) return '';
+            const [y, m, d] = String(iso).split('-');
+            if (!y || !m || !d) return iso;
+            return `${d}/${m}/${y}`;
         }
 
         function showToast(message, type = 'success') {
@@ -470,8 +513,8 @@
                 const name = s.name ? ` · ${escapeHtml(s.name)}` : '';
                 const breed = s.breed ? `<span class="text-stone-400"> · ${escapeHtml(s.breed)}</span>` : '';
                 const vaxRows = (s.vaccinations || []).filter(v => v.status !== 'not_applicable').map(v => {
-                    const due = v.next_due ? `<span class="text-stone-400 num"> · التالي: ${escapeHtml(v.next_due)}</span>` : '';
-                    const last = v.last_date ? `<span class="text-stone-400 num"> · آخر: ${escapeHtml(v.last_date)}</span>` : '';
+                    const due = v.next_due ? `<span class="text-stone-400 num"> · التالي: ${escapeHtml(fmtDate(v.next_due))}</span>` : '';
+                    const last = v.last_date ? `<span class="text-stone-400 num"> · آخر: ${escapeHtml(fmtDate(v.last_date))}</span>` : '';
                     return `<div class="flex flex-wrap items-center gap-1.5 text-xs mt-1">
                         <span class="font-medium text-stone-700">${escapeHtml(v.type_name)}</span>
                         ${statusBadge(v.status)}${last}${due}
@@ -509,7 +552,7 @@
                         <div class="text-sm font-medium">${escapeHtml(r.type_name)}</div>
                         <div class="text-xs text-stone-500 mt-0.5">
                             <span class="num font-semibold">${escapeHtml(r.sheep_tag_id)}</span>${name}
-                            · <span class="num">${escapeHtml(r.administered_date)}</span>
+                            · <span class="num">${escapeHtml(fmtDate(r.administered_date))}</span>
                         </div>
                         ${meta ? `<div class="text-xs text-stone-400 mt-0.5">${meta}</div>` : ''}
                         ${r.notes ? `<div class="text-xs text-stone-400 mt-0.5">${escapeHtml(r.notes)}</div>` : ''}
