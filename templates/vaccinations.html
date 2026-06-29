@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تطعيمات القطيع</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: linear-gradient(165deg, #fafaf9 0%, #f5f5f4 50%, #f0f9ff 100%); }
+        .toast-enter { animation: toastIn 0.3s ease forwards; }
+        .toast-exit { animation: toastOut 0.3s ease forwards; }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(1rem); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateY(0); }
+            to   { opacity: 0; transform: translateY(1rem); }
+        }
+        .num { font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
+        .filter-panel { transition: max-height 0.25s ease, opacity 0.2s ease, padding 0.25s ease; }
+        .filter-panel:not(.expanded) { padding-top: 0; padding-bottom: 0; border-width: 0; }
+        .filter-chip.selected { background: #0284c7; color: white; border-color: #0284c7; }
+        .section-tab.selected { background: #0284c7; color: white; border-color: #0284c7; }
+        .status-badge { font-size: 0.6875rem; font-weight: 600; padding: 0.125rem 0.5rem; border-radius: 9999px; }
+        .status-overdue { background: #fee2e2; color: #b91c1c; }
+        .status-never { background: #e0e7ff; color: #4338ca; }
+        .status-ok { background: #dcfce7; color: #15803d; }
+        .status-not_applicable { background: #f5f5f4; color: #78716c; }
+        .sheep-card { transition: box-shadow 0.15s ease; }
+        .sheep-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+        .rule-card { border-right: 4px solid #0284c7; }
+        .record-row + .record-row { border-top: 1px solid #f5f5f4; }
+        .sheep-pick.selected { background: #e0f2fe; border-color: #0284c7; }
+    </style>
+</head>
+<body class="text-stone-800 min-h-screen font-sans relative pb-24">
+
+    <nav class="bg-white border-b border-stone-200 sticky top-0 z-40">
+        <div class="container mx-auto max-w-4xl px-4 py-3 flex items-center justify-center gap-2 flex-wrap">
+            <a href="/" class="px-4 py-2 rounded-lg text-sm font-medium text-stone-600 hover:bg-stone-100 transition">
+                مُتابع القطيع
+            </a>
+            <a href="/budget" class="px-4 py-2 rounded-lg text-sm font-medium text-stone-600 hover:bg-stone-100 transition">
+                ميزانية المزرعة
+            </a>
+            <a href="/vaccinations" class="px-4 py-2 rounded-lg text-sm font-medium bg-sky-600 text-white shadow-sm">
+                تطعيمات القطيع
+            </a>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-4 max-w-4xl">
+        <header class="my-4 sm:my-6 text-center">
+            <h1 class="text-2xl sm:text-3xl font-bold text-sky-700">تطعيمات القطيع</h1>
+            <p class="text-stone-500 text-sm mt-1">قواعد التطعيم، السجل، ومتابعة المواعيد</p>
+        </header>
+
+        <div id="statsBar" class="bg-white border border-stone-200 rounded-xl shadow-sm mb-4 sm:mb-6 grid grid-cols-3 divide-x divide-stone-100">
+            <div class="text-center py-3.5 sm:py-4 px-3">
+                <div id="statOverdue" class="text-xl sm:text-2xl font-bold text-red-600 num">—</div>
+                <div class="text-xs text-stone-500 mt-0.5">متأخر</div>
+            </div>
+            <div class="text-center py-3.5 sm:py-4 px-3">
+                <div id="statOk" class="text-xl sm:text-2xl font-bold text-emerald-600 num">—</div>
+                <div class="text-xs text-stone-500 mt-0.5">في الموعد</div>
+            </div>
+            <div class="text-center py-3.5 sm:py-4 px-3">
+                <div id="statNever" class="text-xl sm:text-2xl font-bold text-indigo-600 num">—</div>
+                <div class="text-xs text-stone-500 mt-0.5">لم يُطعَّم بعد</div>
+            </div>
+        </div>
+
+        <div class="flex gap-2 mb-4 overflow-x-auto pb-1">
+            <button type="button" data-section="log" class="section-tab selected shrink-0 px-4 py-2 rounded-lg border border-stone-200 text-sm font-medium transition">تسجيل تطعيم</button>
+            <button type="button" data-section="rules" class="section-tab shrink-0 px-4 py-2 rounded-lg border border-stone-200 text-sm font-medium text-stone-600 transition hover:bg-stone-50">قواعد التطعيم</button>
+            <button type="button" data-section="status" class="section-tab shrink-0 px-4 py-2 rounded-lg border border-stone-200 text-sm font-medium text-stone-600 transition hover:bg-stone-50">حالة القطيع</button>
+            <button type="button" data-section="history" class="section-tab shrink-0 px-4 py-2 rounded-lg border border-stone-200 text-sm font-medium text-stone-600 transition hover:bg-stone-50">السجل</button>
+        </div>
+
+        <!-- Log vaccination -->
+        <section id="sectionLog" class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-stone-200 mb-4">
+            <h2 class="text-base sm:text-lg font-bold mb-4">تسجيل تطعيم جديد</h2>
+            <form id="logForm" class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-medium text-stone-500 block mb-1">نوع التطعيم *</label>
+                        <select id="logType" required class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500"></select>
+                    </div>
+                    <div>
+                        <label class="text-xs font-medium text-stone-500 block mb-1">تاريخ التطعيم</label>
+                        <input type="date" id="logDate" class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-medium text-stone-500 block mb-1">الجرعة (اختياري)</label>
+                        <input type="text" id="logDose" placeholder="مثال: 2 مل"
+                            class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="text-xs font-medium text-stone-500 block mb-1">رقم الدفعة (اختياري)</label>
+                        <input type="text" id="logBatch"
+                            class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-stone-500 block mb-1">ملاحظات</label>
+                    <input type="text" id="logNotes"
+                        class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-xs font-medium text-stone-500">اختر الأغنام *</label>
+                        <span id="pickCount" class="text-xs text-sky-600 font-medium">0 محدد</span>
+                    </div>
+                    <input type="text" id="pickSearch" placeholder="ابحث برقم الخروف..." inputmode="numeric" lang="en"
+                        class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm mb-2 outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                    <div class="flex gap-2 mb-2">
+                        <button type="button" id="pickAllVisible" class="text-xs font-medium text-sky-600 hover:text-sky-800">تحديد الظاهر</button>
+                        <button type="button" id="pickClear" class="text-xs font-medium text-stone-500 hover:text-red-600">مسح التحديد</button>
+                    </div>
+                    <div id="sheepPicker" class="max-h-48 overflow-y-auto border border-stone-200 rounded-lg p-2 grid grid-cols-2 sm:grid-cols-3 gap-1.5 bg-stone-50"></div>
+                </div>
+                <button type="submit" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-semibold py-2.5 rounded-lg transition text-sm">
+                    تسجيل التطعيم
+                </button>
+            </form>
+        </section>
+
+        <!-- Rules -->
+        <section id="sectionRules" class="hidden bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-stone-200 mb-4">
+            <h2 class="text-base sm:text-lg font-bold mb-4">قواعد التطعيم</h2>
+            <p class="text-xs text-stone-500 mb-4">حدّد أنواع التطعيم وتكرارها. يمكنك تعديلها أو إيقافها لاحقاً.</p>
+            <div id="rulesList" class="space-y-3 mb-6"></div>
+            <div class="border-t border-stone-100 pt-4">
+                <h3 class="text-sm font-bold mb-3" id="ruleFormTitle">إضافة قاعدة جديدة</h3>
+                <form id="ruleForm" class="space-y-3">
+                    <input type="hidden" id="ruleEditId" value="">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-xs font-medium text-stone-500 block mb-1">اسم التطعيم *</label>
+                            <input type="text" id="ruleName" required placeholder="مثال: طاعون المجترات"
+                                class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-xs font-medium text-stone-500 block mb-1">كل *</label>
+                                <input type="text" id="ruleIntervalValue" required inputmode="numeric" lang="en" value="1"
+                                    class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm num outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                            </div>
+                            <div>
+                                <label class="text-xs font-medium text-stone-500 block mb-1">الوحدة *</label>
+                                <select id="ruleIntervalUnit" class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                                    <option value="days">يوم</option>
+                                    <option value="months" selected>شهر</option>
+                                    <option value="years">سنة</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-xs font-medium text-stone-500 block mb-1">ينطبق على</label>
+                            <select id="ruleAppliesTo" class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                                <option value="">الكل (حملة وخروف)</option>
+                                <option value="حملة">حملة فقط</option>
+                                <option value="خروف">خروف فقط</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-medium text-stone-500 block mb-1">الحد الأدنى للعمر (أيام)</label>
+                            <input type="text" id="ruleMinAge" inputmode="numeric" lang="en" placeholder="بدون حد"
+                                class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm num outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-xs font-medium text-stone-500 block mb-1">ملاحظات</label>
+                        <input type="text" id="ruleNotes"
+                            class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="submit" class="flex-1 bg-sky-600 hover:bg-sky-700 text-white font-semibold py-2 rounded-lg transition text-sm">حفظ القاعدة</button>
+                        <button type="button" id="ruleCancelEdit" class="hidden px-4 py-2 rounded-lg border border-stone-200 text-sm text-stone-600 hover:bg-stone-50">إلغاء</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Status -->
+        <section id="sectionStatus" class="hidden bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-stone-200 mb-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <h2 class="text-base sm:text-lg font-bold">حالة التطعيمات</h2>
+                <p id="statusCount" class="text-xs text-stone-500"></p>
+            </div>
+
+            <div class="mb-4 space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                    <button type="button" id="filterToggle" aria-expanded="false"
+                        class="inline-flex items-center gap-2 px-3.5 py-2 rounded-full border border-stone-200 bg-white hover:border-stone-300 text-sm font-medium text-stone-700 shadow-sm">
+                        <svg class="w-4 h-4 text-stone-500" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" d="M4 6h16M7 12h10M10 18h4"/></svg>
+                        <span>فلاتر</span>
+                        <span id="filterBadge" class="hidden min-w-[1.25rem] h-5 px-1.5 rounded-full bg-sky-600 text-white text-[11px] font-bold inline-flex items-center justify-center">0</span>
+                        <span id="filterChevron" class="text-stone-400 text-[10px] transition-transform">▼</span>
+                    </button>
+                    <button type="button" id="clearFilters" class="hidden text-xs font-medium text-stone-500 hover:text-red-600 px-2 py-1">مسح الفلاتر</button>
+                </div>
+                <div id="filterPanel" class="filter-panel rounded-2xl bg-stone-50 border border-stone-200/80 px-4 py-0 space-y-4 max-h-0 opacity-0 overflow-hidden">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+                        <div>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">حالة التطعيم</span>
+                            <div id="statusFilters" class="flex flex-wrap gap-1.5"></div>
+                        </div>
+                        <div>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">نوع التطعيم</span>
+                            <div id="typeFilters" class="flex flex-wrap gap-1.5"></div>
+                        </div>
+                        <div>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">جنس الخروف</span>
+                            <div id="genderFilters" class="flex flex-wrap gap-1.5"></div>
+                        </div>
+                        <div>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">السلالة</span>
+                            <div id="breedFilters" class="flex flex-wrap gap-1.5"></div>
+                        </div>
+                    </div>
+                    <div class="pb-4">
+                        <span class="text-xs font-medium text-stone-500 mb-2 block">مستحق التطعيم بحلول تاريخ</span>
+                        <input type="date" id="dueByFilter"
+                            class="bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                        <p class="text-[11px] text-stone-400 mt-1">يعرض الأغنام التي لديها تطعيم مستحق أو متأخر بحلول هذا التاريخ</p>
+                    </div>
+                </div>
+                <input type="text" id="statusSearch" placeholder="ابحث برقم الخروف..." inputmode="numeric" lang="en"
+                    class="w-full bg-stone-50 border border-stone-200 rounded-xl py-2.5 px-4 text-sm outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+            </div>
+            <div id="sheepStatusList" class="space-y-3"></div>
+            <div id="statusEmpty" class="hidden text-center py-12 text-stone-500 text-sm">لا توجد نتائج مطابقة</div>
+        </section>
+
+        <!-- History -->
+        <section id="sectionHistory" class="hidden bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-stone-200 mb-4">
+            <h2 class="text-base sm:text-lg font-bold mb-4">سجل التطعيمات</h2>
+            <div id="historyList"></div>
+            <div id="historyEmpty" class="hidden text-center py-12 text-stone-500 text-sm">لا توجد تطعيمات مسجّلة بعد</div>
+        </section>
+    </div>
+
+    <div id="toastContainer" class="fixed bottom-6 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <script>
+        let dashboard = { types: [], sheep: [], summary: {}, recent_records: [] };
+        let selectedSheep = new Set();
+        let activeSection = 'log';
+        let filtersExpanded = false;
+        let activeStatusFilter = '';
+        let activeTypeFilter = '';
+        let activeGenderFilter = '';
+        let activeBreedFilter = '';
+        let dueByFilter = '';
+
+        const STATUS_LABELS = {
+            overdue: 'متأخر',
+            never: 'لم يُطعَّم',
+            ok: 'في الموعد',
+            not_applicable: 'لا ينطبق',
+        };
+        const UNIT_LABELS = { days: 'يوم', months: 'شهر', years: 'سنة' };
+        const GENDER_OPTIONS = [
+            { value: '', label: 'الكل' },
+            { value: 'حملة', label: 'حملة' },
+            { value: 'خروف', label: 'خروف' },
+        ];
+        const STATUS_FILTER_OPTIONS = [
+            { value: '', label: 'الكل' },
+            { value: 'overdue', label: 'متأخر' },
+            { value: 'never', label: 'لم يُطعَّم' },
+            { value: 'ok', label: 'في الموعد' },
+        ];
+
+        function escapeHtml(str) {
+            if (str == null) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function extractDigits(str) {
+            return String(str || '').replace(/\D/g, '');
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const el = document.createElement('div');
+            const bg = type === 'error' ? 'bg-red-600' : 'bg-stone-800';
+            el.className = `toast-enter ${bg} text-white text-sm px-4 py-2.5 rounded-lg shadow-lg pointer-events-auto max-w-xs`;
+            el.textContent = message;
+            container.appendChild(el);
+            setTimeout(() => {
+                el.classList.replace('toast-enter', 'toast-exit');
+                setTimeout(() => el.remove(), 300);
+            }, 2800);
+        }
+
+        function filterChipClass(active) {
+            return active
+                ? 'filter-chip selected px-2.5 py-1 rounded-lg text-xs font-medium border transition'
+                : 'px-2.5 py-1 rounded-lg text-xs font-medium border border-stone-200 bg-white text-stone-600 transition hover:border-stone-300 hover:bg-stone-50';
+        }
+
+        function statusBadge(status) {
+            const label = STATUS_LABELS[status] || status;
+            return `<span class="status-badge status-${status}">${escapeHtml(label)}</span>`;
+        }
+
+        function intervalLabel(value, unit) {
+            const u = UNIT_LABELS[unit] || unit;
+            if (value === 1) {
+                if (unit === 'days') return 'يومياً';
+                if (unit === 'months') return 'شهرياً';
+                if (unit === 'years') return 'سنوياً';
+            }
+            return `كل ${value} ${u}`;
+        }
+
+        function setSection(name) {
+            activeSection = name;
+            document.querySelectorAll('.section-tab').forEach(btn => {
+                const on = btn.dataset.section === name;
+                btn.classList.toggle('selected', on);
+                btn.classList.toggle('text-stone-600', !on);
+                btn.classList.toggle('hover:bg-stone-50', !on);
+            });
+            ['Log', 'Rules', 'Status', 'History'].forEach(s => {
+                document.getElementById('section' + s).classList.toggle('hidden', s.toLowerCase() !== name);
+            });
+        }
+
+        function updateStats() {
+            const s = dashboard.summary || {};
+            document.getElementById('statOverdue').textContent = s.overdue ?? 0;
+            document.getElementById('statOk').textContent = s.ok ?? 0;
+            document.getElementById('statNever').textContent = s.never ?? 0;
+        }
+
+        function renderTypeSelect() {
+            const sel = document.getElementById('logType');
+            const active = (dashboard.types || []).filter(t => t.is_active !== false);
+            sel.innerHTML = '<option value="">— اختر نوع التطعيم —</option>' +
+                active.map(t => `<option value="${t.id}">${escapeHtml(t.name)} (${intervalLabel(t.interval_value, t.interval_unit)})</option>`).join('');
+        }
+
+        function renderSheepPicker() {
+            const container = document.getElementById('sheepPicker');
+            const query = extractDigits(document.getElementById('pickSearch').value);
+            let sheep = dashboard.sheep || [];
+            if (query) sheep = sheep.filter(s => extractDigits(s.tag_id).includes(query));
+            container.innerHTML = sheep.map(s => {
+                const on = selectedSheep.has(s.tag_id);
+                const name = s.name ? ` · ${escapeHtml(s.name)}` : '';
+                return `<button type="button" data-tag="${escapeHtml(s.tag_id)}" class="sheep-pick text-right text-xs px-2.5 py-2 rounded-lg border border-stone-200 bg-white transition ${on ? 'selected' : ''}">
+                    <span class="num font-semibold">${escapeHtml(s.tag_id)}</span>${name}
+                </button>`;
+            }).join('') || '<p class="col-span-full text-center text-xs text-stone-400 py-4">لا توجد أغنام أحياء</p>';
+            document.getElementById('pickCount').textContent = `${selectedSheep.size} محدد`;
+        }
+
+        function renderRules() {
+            const container = document.getElementById('rulesList');
+            const types = dashboard.all_types || dashboard.types || [];
+            if (!types.length) {
+                container.innerHTML = '<p class="text-sm text-stone-500 text-center py-6">لا توجد قواعد بعد — أضف أول قاعدة أدناه</p>';
+                return;
+            }
+            container.innerHTML = types.map(t => {
+                const applies = t.applies_to_sheep_type ? escapeHtml(t.applies_to_sheep_type) : 'الكل';
+                const minAge = t.min_age_days != null ? ` · من عمر ${t.min_age_days} يوم` : '';
+                const inactive = t.is_active === false ? '<span class="text-xs text-stone-400">(موقوف)</span>' : '';
+                return `<div class="rule-card bg-stone-50 rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                    <div class="min-w-0">
+                        <div class="font-bold text-stone-800">${escapeHtml(t.name)} ${inactive}</div>
+                        <div class="text-xs text-stone-500 mt-1">${intervalLabel(t.interval_value, t.interval_unit)} · ${applies}${minAge}</div>
+                        ${t.notes ? `<div class="text-xs text-stone-400 mt-1">${escapeHtml(t.notes)}</div>` : ''}
+                    </div>
+                    <div class="flex gap-2 shrink-0">
+                        <button type="button" data-edit-rule="${t.id}" class="text-xs font-medium px-3 py-1.5 rounded-lg border border-stone-200 hover:bg-white transition">تعديل</button>
+                        <button type="button" data-delete-rule="${t.id}" class="text-xs font-medium px-3 py-1.5 rounded-lg text-red-600 border border-red-100 hover:bg-red-50 transition">حذف</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function renderFilterChips() {
+            const mk = (containerId, options, active, attr) => {
+                document.getElementById(containerId).innerHTML = options.map(o =>
+                    `<button type="button" ${attr}="${escapeHtml(o.value)}" class="${filterChipClass(active === o.value)}">${escapeHtml(o.label)}</button>`
+                ).join('');
+            };
+            mk('statusFilters', STATUS_FILTER_OPTIONS, activeStatusFilter, 'data-status-filter');
+            const typeOpts = [{ value: '', label: 'الكل' }, ...(dashboard.types || []).filter(t => t.is_active !== false).map(t => ({ value: String(t.id), label: t.name }))];
+            mk('typeFilters', typeOpts, activeTypeFilter, 'data-type-filter');
+            mk('genderFilters', GENDER_OPTIONS, activeGenderFilter, 'data-gender-filter');
+            const breeds = [...new Set((dashboard.sheep || []).map(s => s.breed).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ar'));
+            const breedOpts = [{ value: '', label: 'الكل' }, ...breeds.map(b => ({ value: b, label: b }))];
+            mk('breedFilters', breedOpts, activeBreedFilter, 'data-breed-filter');
+            updateFilterBadge();
+        }
+
+        function updateFilterBadge() {
+            let count = 0;
+            if (activeStatusFilter) count++;
+            if (activeTypeFilter) count++;
+            if (activeGenderFilter) count++;
+            if (activeBreedFilter) count++;
+            if (dueByFilter) count++;
+            const badge = document.getElementById('filterBadge');
+            const clear = document.getElementById('clearFilters');
+            badge.textContent = count;
+            badge.classList.toggle('hidden', count === 0);
+            clear.classList.toggle('hidden', count === 0);
+        }
+
+        function matchesTypeFilter(sheep) {
+            if (!activeTypeFilter) return true;
+            const typeId = parseInt(activeTypeFilter, 10);
+            const v = sheep.vaccinations.find(x => x.type_id === typeId);
+            if (!v || v.status === 'not_applicable') return false;
+            if (activeStatusFilter) return v.status === activeStatusFilter;
+            return ['overdue', 'never'].includes(v.status) || activeStatusFilter === '';
+        }
+
+        function getFilteredSheep() {
+            let list = dashboard.sheep || [];
+            const query = extractDigits(document.getElementById('statusSearch')?.value || '');
+
+            if (activeStatusFilter && !activeTypeFilter) {
+                list = list.filter(s => s.overall_status === activeStatusFilter);
+            }
+            if (activeTypeFilter) {
+                list = list.filter(matchesTypeFilter);
+            }
+            if (activeGenderFilter) {
+                list = list.filter(s => s.sheep_type === activeGenderFilter);
+            }
+            if (activeBreedFilter) {
+                list = list.filter(s => s.breed === activeBreedFilter);
+            }
+            if (query) {
+                list = list.filter(s => extractDigits(s.tag_id).includes(query));
+            }
+            if (dueByFilter) {
+                list = list.filter(s => (s.vaccinations || []).some(v =>
+                    v.status !== 'not_applicable' && ['overdue', 'never'].includes(v.status)
+                ));
+            }
+            return list;
+        }
+
+        function renderSheepStatus() {
+            const list = getFilteredSheep();
+            const container = document.getElementById('sheepStatusList');
+            const empty = document.getElementById('statusEmpty');
+            document.getElementById('statusCount').textContent = `${list.length} من ${(dashboard.sheep || []).length}`;
+
+            if (!list.length) {
+                container.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+            empty.classList.add('hidden');
+            container.innerHTML = list.map(s => {
+                const name = s.name ? ` · ${escapeHtml(s.name)}` : '';
+                const breed = s.breed ? `<span class="text-stone-400"> · ${escapeHtml(s.breed)}</span>` : '';
+                const vaxRows = (s.vaccinations || []).filter(v => v.status !== 'not_applicable').map(v => {
+                    const due = v.next_due ? `<span class="text-stone-400 num"> · التالي: ${escapeHtml(v.next_due)}</span>` : '';
+                    const last = v.last_date ? `<span class="text-stone-400 num"> · آخر: ${escapeHtml(v.last_date)}</span>` : '';
+                    return `<div class="flex flex-wrap items-center gap-1.5 text-xs mt-1">
+                        <span class="font-medium text-stone-700">${escapeHtml(v.type_name)}</span>
+                        ${statusBadge(v.status)}${last}${due}
+                    </div>`;
+                }).join('');
+                return `<div class="sheep-card border border-stone-200 rounded-xl p-3 sm:p-4 bg-white">
+                    <div class="flex items-start justify-between gap-2 mb-2">
+                        <div>
+                            <span class="num font-bold text-base text-stone-900">${escapeHtml(s.tag_id)}</span>${name}${breed}
+                            <div class="text-[11px] text-stone-400 mt-0.5">${escapeHtml(s.sheep_type || '')}</div>
+                        </div>
+                        ${s.overall_status !== 'not_applicable' ? statusBadge(s.overall_status) : ''}
+                    </div>
+                    ${vaxRows || '<p class="text-xs text-stone-400">لا تنطبق قواعد تطعيم</p>'}
+                    <button type="button" data-quick-log="${escapeHtml(s.tag_id)}" class="mt-2 text-xs font-medium text-sky-600 hover:text-sky-800">+ تسجيل تطعيم سريع</button>
+                </div>`;
+            }).join('');
+        }
+
+        function renderHistory() {
+            const records = dashboard.recent_records || [];
+            const container = document.getElementById('historyList');
+            const empty = document.getElementById('historyEmpty');
+            if (!records.length) {
+                container.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+            empty.classList.add('hidden');
+            container.innerHTML = records.map(r => {
+                const name = r.sheep_name ? ` · ${escapeHtml(r.sheep_name)}` : '';
+                const meta = [r.dose, r.batch_number].filter(Boolean).map(escapeHtml).join(' · ');
+                return `<div class="record-row py-3 flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <div class="text-sm font-medium">${escapeHtml(r.type_name)}</div>
+                        <div class="text-xs text-stone-500 mt-0.5">
+                            <span class="num font-semibold">${escapeHtml(r.sheep_tag_id)}</span>${name}
+                            · <span class="num">${escapeHtml(r.administered_date)}</span>
+                        </div>
+                        ${meta ? `<div class="text-xs text-stone-400 mt-0.5">${meta}</div>` : ''}
+                        ${r.notes ? `<div class="text-xs text-stone-400 mt-0.5">${escapeHtml(r.notes)}</div>` : ''}
+                    </div>
+                    <button type="button" data-delete-record="${r.id}" class="text-stone-400 hover:text-red-600 text-lg shrink-0" title="حذف">×</button>
+                </div>`;
+            }).join('');
+        }
+
+        async function fetchDashboard() {
+            const params = dueByFilter ? `?due_by=${encodeURIComponent(dueByFilter)}` : '';
+            const res = await fetch('/api/vaccinations/dashboard' + params);
+            dashboard = await res.json();
+            updateStats();
+            renderTypeSelect();
+            renderSheepPicker();
+            renderRules();
+            renderFilterChips();
+            renderSheepStatus();
+            renderHistory();
+        }
+
+        function resetRuleForm() {
+            document.getElementById('ruleEditId').value = '';
+            document.getElementById('ruleFormTitle').textContent = 'إضافة قاعدة جديدة';
+            document.getElementById('ruleForm').reset();
+            document.getElementById('ruleIntervalValue').value = '1';
+            document.getElementById('ruleIntervalUnit').value = 'months';
+            document.getElementById('ruleCancelEdit').classList.add('hidden');
+        }
+
+        function startEditRule(id) {
+            const t = (dashboard.all_types || dashboard.types || []).find(x => x.id === id);
+            if (!t) return;
+            document.getElementById('ruleEditId').value = t.id;
+            document.getElementById('ruleFormTitle').textContent = 'تعديل القاعدة';
+            document.getElementById('ruleName').value = t.name || '';
+            document.getElementById('ruleIntervalValue').value = t.interval_value;
+            document.getElementById('ruleIntervalUnit').value = t.interval_unit;
+            document.getElementById('ruleAppliesTo').value = t.applies_to_sheep_type || '';
+            document.getElementById('ruleMinAge').value = t.min_age_days != null ? t.min_age_days : '';
+            document.getElementById('ruleNotes').value = t.notes || '';
+            document.getElementById('ruleCancelEdit').classList.remove('hidden');
+            setSection('rules');
+            document.getElementById('ruleForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function toggleFilterPanel(force) {
+            filtersExpanded = typeof force === 'boolean' ? force : !filtersExpanded;
+            const panel = document.getElementById('filterPanel');
+            const chevron = document.getElementById('filterChevron');
+            panel.classList.toggle('expanded', filtersExpanded);
+            panel.classList.toggle('max-h-0', !filtersExpanded);
+            panel.classList.toggle('opacity-0', !filtersExpanded);
+            panel.classList.toggle('max-h-[520px]', filtersExpanded);
+            panel.classList.toggle('opacity-100', filtersExpanded);
+            chevron.classList.toggle('rotate-180', filtersExpanded);
+            document.getElementById('filterToggle').setAttribute('aria-expanded', filtersExpanded ? 'true' : 'false');
+        }
+
+        document.querySelectorAll('.section-tab').forEach(btn => {
+            btn.addEventListener('click', () => setSection(btn.dataset.section));
+        });
+
+        document.getElementById('logForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const typeId = document.getElementById('logType').value;
+            if (!typeId) { showToast('اختر نوع التطعيم', 'error'); return; }
+            if (!selectedSheep.size) { showToast('اختر خروفاً واحداً على الأقل', 'error'); return; }
+            try {
+                const res = await fetch('/api/vaccinations/records', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        vaccination_type_id: parseInt(typeId, 10),
+                        administered_date: document.getElementById('logDate').value,
+                        dose: document.getElementById('logDose').value.trim(),
+                        batch_number: document.getElementById('logBatch').value.trim(),
+                        notes: document.getElementById('logNotes').value.trim(),
+                        sheep_tag_ids: [...selectedSheep],
+                    }),
+                });
+                const result = await res.json();
+                showToast(result.message, result.success !== false ? 'success' : 'error');
+                if (result.success !== false) {
+                    selectedSheep.clear();
+                    document.getElementById('logDose').value = '';
+                    document.getElementById('logBatch').value = '';
+                    document.getElementById('logNotes').value = '';
+                    await fetchDashboard();
+                }
+            } catch {
+                showToast('تعذر تسجيل التطعيم', 'error');
+            }
+        });
+
+        document.getElementById('ruleForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const editId = document.getElementById('ruleEditId').value;
+            const payload = {
+                name: document.getElementById('ruleName').value.trim(),
+                interval_value: document.getElementById('ruleIntervalValue').value,
+                interval_unit: document.getElementById('ruleIntervalUnit').value,
+                applies_to_sheep_type: document.getElementById('ruleAppliesTo').value,
+                min_age_days: document.getElementById('ruleMinAge').value.trim(),
+                notes: document.getElementById('ruleNotes').value.trim(),
+            };
+            try {
+                const url = editId ? `/api/vaccinations/types/${editId}` : '/api/vaccinations/types';
+                const res = await fetch(url, {
+                    method: editId ? 'PUT' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await res.json();
+                showToast(result.message, result.success !== false ? 'success' : 'error');
+                if (result.success !== false) {
+                    resetRuleForm();
+                    await fetchDashboard();
+                }
+            } catch {
+                showToast('تعذر حفظ القاعدة', 'error');
+            }
+        });
+
+        document.getElementById('ruleCancelEdit').addEventListener('click', resetRuleForm);
+
+        document.getElementById('sheepPicker').addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-tag]');
+            if (!btn) return;
+            const tag = btn.dataset.tag;
+            if (selectedSheep.has(tag)) selectedSheep.delete(tag);
+            else selectedSheep.add(tag);
+            renderSheepPicker();
+        });
+
+        document.getElementById('pickSearch').addEventListener('input', renderSheepPicker);
+
+        document.getElementById('pickAllVisible').addEventListener('click', () => {
+            const query = extractDigits(document.getElementById('pickSearch').value);
+            let sheep = dashboard.sheep || [];
+            if (query) sheep = sheep.filter(s => extractDigits(s.tag_id).includes(query));
+            sheep.forEach(s => selectedSheep.add(s.tag_id));
+            renderSheepPicker();
+        });
+
+        document.getElementById('pickClear').addEventListener('click', () => {
+            selectedSheep.clear();
+            renderSheepPicker();
+        });
+
+        document.getElementById('filterToggle').addEventListener('click', () => toggleFilterPanel());
+        document.getElementById('clearFilters').addEventListener('click', () => {
+            activeStatusFilter = '';
+            activeTypeFilter = '';
+            activeGenderFilter = '';
+            activeBreedFilter = '';
+            dueByFilter = '';
+            document.getElementById('dueByFilter').value = '';
+            renderFilterChips();
+            fetchDashboard();
+        });
+
+        document.getElementById('filterPanel').addEventListener('click', (e) => {
+            const t = e.target.closest('[data-status-filter]');
+            if (t) { activeStatusFilter = t.dataset.statusFilter; renderFilterChips(); renderSheepStatus(); return; }
+            const tf = e.target.closest('[data-type-filter]');
+            if (tf) { activeTypeFilter = tf.dataset.typeFilter; renderFilterChips(); renderSheepStatus(); return; }
+            const g = e.target.closest('[data-gender-filter]');
+            if (g) { activeGenderFilter = g.dataset.genderFilter; renderFilterChips(); renderSheepStatus(); return; }
+            const b = e.target.closest('[data-breed-filter]');
+            if (b) { activeBreedFilter = b.dataset.breedFilter; renderFilterChips(); renderSheepStatus(); }
+        });
+
+        document.getElementById('dueByFilter').addEventListener('change', (e) => {
+            dueByFilter = e.target.value;
+            updateFilterBadge();
+            fetchDashboard();
+        });
+
+        document.getElementById('statusSearch').addEventListener('input', renderSheepStatus);
+
+        document.getElementById('rulesList').addEventListener('click', async (e) => {
+            const editBtn = e.target.closest('[data-edit-rule]');
+            if (editBtn) { startEditRule(parseInt(editBtn.dataset.editRule, 10)); return; }
+            const delBtn = e.target.closest('[data-delete-rule]');
+            if (!delBtn) return;
+            if (!confirm('حذف قاعدة التطعيم وجميع سجلاتها؟')) return;
+            try {
+                const res = await fetch(`/api/vaccinations/types/${delBtn.dataset.deleteRule}`, { method: 'DELETE' });
+                const result = await res.json();
+                showToast(result.message, result.success !== false ? 'success' : 'error');
+                if (result.success !== false) await fetchDashboard();
+            } catch {
+                showToast('تعذر الحذف', 'error');
+            }
+        });
+
+        document.getElementById('sheepStatusList').addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-quick-log]');
+            if (!btn) return;
+            selectedSheep.clear();
+            selectedSheep.add(btn.dataset.quickLog);
+            setSection('log');
+            renderSheepPicker();
+            document.getElementById('logForm').scrollIntoView({ behavior: 'smooth' });
+        });
+
+        document.getElementById('historyList').addEventListener('click', async (e) => {
+            const btn = e.target.closest('[data-delete-record]');
+            if (!btn) return;
+            if (!confirm('حذف سجل التطعيم؟')) return;
+            try {
+                const res = await fetch(`/api/vaccinations/records/${btn.dataset.deleteRecord}`, { method: 'DELETE' });
+                const result = await res.json();
+                showToast(result.message, result.success !== false ? 'success' : 'error');
+                if (result.success !== false) await fetchDashboard();
+            } catch {
+                showToast('تعذر الحذف', 'error');
+            }
+        });
+
+        document.getElementById('logDate').value = new Date().toISOString().slice(0, 10);
+        fetchDashboard();
+    </script>
+</body>
+</html>

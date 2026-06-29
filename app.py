@@ -161,6 +161,34 @@ def init_db():
         cursor.execute("ALTER TABLE budget_transactions ADD COLUMN sold_sheep_tag_id TEXT REFERENCES sheep(tag_id) ON DELETE SET NULL")
     seed_budget_categories(cursor)
     remove_budget_category_by_name(cursor, 'صيانة')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS vaccination_types (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            interval_value INTEGER NOT NULL,
+            interval_unit TEXT NOT NULL,
+            applies_to_sheep_type TEXT,
+            min_age_days INTEGER,
+            notes TEXT,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS vaccination_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vaccination_type_id INTEGER NOT NULL,
+            sheep_tag_id TEXT NOT NULL,
+            administered_date TEXT NOT NULL,
+            dose TEXT,
+            batch_number TEXT,
+            notes TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (vaccination_type_id) REFERENCES vaccination_types(id) ON DELETE CASCADE,
+            FOREIGN KEY (sheep_tag_id) REFERENCES sheep(tag_id) ON DELETE CASCADE
+        )
+    ''')
+    seed_vaccination_types(cursor)
     conn.commit()
     conn.close()
 
@@ -586,6 +614,11 @@ def index():
 def budget():
     """Renders the farm budget tracker."""
     return render_template('budget.html')
+
+@app.route('/vaccinations')
+def vaccinations():
+    """Renders the flock vaccination tracker."""
+    return render_template('vaccinations.html')
 
 @app.route('/api/breeds', methods=['GET'])
 def get_breeds():
@@ -1616,6 +1649,473 @@ def delete_budget_transaction(transaction_id):
         conn.commit()
         conn.close()
         return jsonify({"success": True, "message": "تم حذف الحركة."})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+VACCINATION_INTERVAL_UNITS = ('days', 'months', 'years')
+VACCINATION_INTERVAL_LABELS = {
+    'days': 'يوم',
+    'months': 'شهر',
+    'years': 'سنة',
+}
+
+DEFAULT_VACCINATION_TYPES = (
+    ('طاعون المجترات الصغيرة', 1, 'years', None, None, 'تطعيم سنوي ضد طاعون المجترات الصغيرة'),
+    ('تجمع معوي', 6, 'months', None, None, 'كل 6 أشهر'),
+)
+
+def seed_vaccination_types(cursor):
+    cursor.execute("SELECT COUNT(*) FROM vaccination_types")
+    if cursor.fetchone()[0] > 0:
+        return
+    for name, interval_value, interval_unit, applies_to, min_age, notes in DEFAULT_VACCINATION_TYPES:
+        cursor.execute(
+            "INSERT INTO vaccination_types (name, interval_value, interval_unit, applies_to_sheep_type, min_age_days, notes, is_active, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, 1, ?)",
+            (name, interval_value, interval_unit, applies_to, min_age, notes, now_iso()),
+        )
+
+def add_interval_to_date(base_date, value, unit):
+    if not base_date or value is None or not unit:
+        return None
+    if unit == 'days':
+        return base_date + timedelta(days=value)
+    if unit == 'months':
+        month = base_date.month - 1 + value
+        year = base_date.year + month // 12
+        month = month % 12 + 1
+        days_in_month = [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28,
+                         31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1]
+        day = min(base_date.day, days_in_month)
+        return date(year, month, day)
+    if unit == 'years':
+        try:
+            return base_date.replace(year=base_date.year + value)
+        except ValueError:
+            return base_date.replace(year=base_date.year + value, day=28)
+    return None
+
+def sheep_age_days(sheep_row):
+    birth = parse_date(sheep_row.get('birth_date') if isinstance(sheep_row, dict) else sheep_row[4])
+    if not birth:
+        return None
+    return (date.today() - birth).days
+
+def vaccination_type_applies(vtype, sheep):
+    if not vtype.get('is_active', True):
+        return False
+    applies_to = vtype.get('applies_to_sheep_type')
+    if applies_to and sheep.get('sheep_type') != applies_to:
+        return False
+    min_age = vtype.get('min_age_days')
+    if min_age is not None:
+        age = sheep_age_days(sheep)
+        if age is None or age < min_age:
+            return False
+    return True
+
+def compute_vaccination_status(last_date_str, interval_value, interval_unit, reference_date=None):
+    reference_date = reference_date or date.today()
+    if not last_date_str:
+        return 'never', None
+    last_date = parse_date(last_date_str)
+    if not last_date:
+        return 'never', None
+    next_due = add_interval_to_date(last_date, interval_value, interval_unit)
+    if not next_due:
+        return 'never', None
+    if next_due <= reference_date:
+        return 'overdue', next_due.isoformat()
+    return 'ok', next_due.isoformat()
+
+def fetch_vaccination_types(cursor, active_only=False):
+    query = (
+        "SELECT id, name, interval_value, interval_unit, applies_to_sheep_type, "
+        "min_age_days, notes, is_active, created_at FROM vaccination_types"
+    )
+    if active_only:
+        query += " WHERE is_active = 1"
+    query += " ORDER BY name COLLATE NOCASE ASC"
+    cursor.execute(query)
+    return [
+        {
+            "id": row[0],
+            "name": row[1],
+            "interval_value": row[2],
+            "interval_unit": row[3],
+            "applies_to_sheep_type": row[4],
+            "min_age_days": row[5],
+            "notes": row[6],
+            "is_active": bool(row[7]),
+            "created_at": row[8],
+        }
+        for row in cursor.fetchall()
+    ]
+
+def fetch_vaccination_type_or_404(cursor, type_id):
+    cursor.execute(
+        "SELECT id, name, interval_value, interval_unit, applies_to_sheep_type, min_age_days, notes, is_active "
+        "FROM vaccination_types WHERE id = ?",
+        (type_id,),
+    )
+    return cursor.fetchone()
+
+def vaccination_type_row_to_dict(row):
+    return {
+        "id": row[0],
+        "name": row[1],
+        "interval_value": row[2],
+        "interval_unit": row[3],
+        "applies_to_sheep_type": row[4],
+        "min_age_days": row[5],
+        "notes": row[6],
+        "is_active": bool(row[7]),
+    }
+
+def parse_vaccination_interval(data):
+    try:
+        interval_value = int(to_western_digits(data.get('interval_value', '')).strip())
+    except (TypeError, ValueError):
+        return None, None, 'قيمة التكرار يجب أن تكون رقماً صحيحاً.'
+    if interval_value <= 0:
+        return None, None, 'قيمة التكرار يجب أن تكون أكبر من صفر.'
+    interval_unit = (data.get('interval_unit') or '').strip()
+    if interval_unit not in VACCINATION_INTERVAL_UNITS:
+        return None, None, 'وحدة التكرار غير صالحة.'
+    return interval_value, interval_unit, None
+
+def parse_min_age_days(data):
+    raw = data.get('min_age_days')
+    if raw is None or raw == '':
+        return None, None
+    try:
+        days = int(to_western_digits(raw).strip())
+    except (TypeError, ValueError):
+        return None, 'الحد الأدنى للعمر يجب أن يكون رقماً صحيحاً.'
+    if days < 0:
+        return None, 'الحد الأدنى للعمر لا يمكن أن يكون سالباً.'
+    return days, None
+
+def fetch_last_vaccinations_by_sheep(cursor):
+    cursor.execute('''
+        SELECT vaccination_type_id, sheep_tag_id, MAX(administered_date), MAX(id)
+        FROM vaccination_records
+        GROUP BY vaccination_type_id, sheep_tag_id
+    ''')
+    last_by_key = {}
+    for type_id, tag_id, last_date, record_id in cursor.fetchall():
+        last_by_key[(type_id, tag_id)] = {"last_date": last_date, "record_id": record_id}
+    return last_by_key
+
+def fetch_vaccination_records(cursor, limit=None):
+    query = '''
+        SELECT r.id, r.vaccination_type_id, t.name, r.sheep_tag_id, s.name,
+               r.administered_date, r.dose, r.batch_number, r.notes, r.created_at
+        FROM vaccination_records r
+        JOIN vaccination_types t ON t.id = r.vaccination_type_id
+        LEFT JOIN sheep s ON s.tag_id = r.sheep_tag_id
+        ORDER BY r.administered_date DESC, r.id DESC
+    '''
+    if limit:
+        query += f" LIMIT {int(limit)}"
+    cursor.execute(query)
+    return [
+        {
+            "id": row[0],
+            "vaccination_type_id": row[1],
+            "type_name": row[2],
+            "sheep_tag_id": row[3],
+            "sheep_name": row[4],
+            "administered_date": row[5],
+            "dose": row[6],
+            "batch_number": row[7],
+            "notes": row[8],
+            "created_at": row[9],
+        }
+        for row in cursor.fetchall()
+    ]
+
+def build_vaccination_dashboard(cursor, due_by=None):
+    due_by_date = parse_date(due_by) if due_by else date.today()
+    types = fetch_vaccination_types(cursor, active_only=True)
+    last_by_key = fetch_last_vaccinations_by_sheep(cursor)
+    cursor.execute(SHEEP_SELECT + " WHERE status = 'حي' ORDER BY CAST(tag_id AS INTEGER), tag_id")
+    sheep_rows = cursor.fetchall()
+    sheep_status = []
+    summary = {"live": 0, "overdue": 0, "ok": 0, "never": 0}
+
+    for row in sheep_rows:
+        sheep = sheep_row_to_dict(row)
+        summary["live"] += 1
+        vaccinations = []
+        worst = 'ok'
+        priority = {'overdue': 3, 'never': 2, 'not_applicable': 0, 'ok': 1}
+
+        for vtype in types:
+            if not vaccination_type_applies(vtype, sheep):
+                vaccinations.append({
+                    "type_id": vtype["id"],
+                    "type_name": vtype["name"],
+                    "status": "not_applicable",
+                    "last_date": None,
+                    "next_due": None,
+                })
+                continue
+
+            key = (vtype["id"], sheep["tag_id"])
+            last_info = last_by_key.get(key)
+            last_date = last_info["last_date"] if last_info else None
+            status, next_due = compute_vaccination_status(
+                last_date, vtype["interval_value"], vtype["interval_unit"], due_by_date
+            )
+            vaccinations.append({
+                "type_id": vtype["id"],
+                "type_name": vtype["name"],
+                "status": status,
+                "last_date": last_date,
+                "next_due": next_due,
+            })
+            if priority.get(status, 0) > priority.get(worst, 0):
+                worst = status
+
+        if not any(v["status"] != "not_applicable" for v in vaccinations):
+            worst = "not_applicable"
+
+        if worst == 'not_applicable':
+            pass
+        elif worst in summary:
+            summary[worst] += 1
+        else:
+            summary["ok"] += 1
+
+        sheep_status.append({
+            "tag_id": sheep["tag_id"],
+            "name": sheep["name"],
+            "breed": sheep["breed"],
+            "sheep_type": sheep["sheep_type"],
+            "birth_date": sheep["birth_date"],
+            "status": sheep["status"],
+            "overall_status": worst,
+            "vaccinations": vaccinations,
+        })
+
+    return {
+        "summary": summary,
+        "types": types,
+        "sheep": sheep_status,
+        "due_by": due_by_date.isoformat(),
+    }
+
+@app.route('/api/vaccinations/types', methods=['GET'])
+def get_vaccination_types():
+    conn = get_connection()
+    cursor = conn.cursor()
+    types = fetch_vaccination_types(cursor)
+    conn.close()
+    return jsonify(types)
+
+@app.route('/api/vaccinations/types', methods=['POST'])
+def add_vaccination_type():
+    data = request.json or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({"success": False, "message": "الرجاء إدخال اسم التطعيم."}), 400
+    interval_value, interval_unit, interval_error = parse_vaccination_interval(data)
+    if interval_error:
+        return jsonify({"success": False, "message": interval_error}), 400
+    min_age_days, min_age_error = parse_min_age_days(data)
+    if min_age_error:
+        return jsonify({"success": False, "message": min_age_error}), 400
+    applies_to = (data.get('applies_to_sheep_type') or '').strip() or None
+    if applies_to and applies_to not in ('حملة', 'خروف'):
+        return jsonify({"success": False, "message": "نوع الخروف غير صالح."}), 400
+    notes = (data.get('notes') or '').strip()
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO vaccination_types (name, interval_value, interval_unit, applies_to_sheep_type, min_age_days, notes, is_active, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, 1, ?)",
+            (name, interval_value, interval_unit, applies_to, min_age_days, notes, now_iso()),
+        )
+        conn.commit()
+        new_id = cursor.lastrowid
+        conn.close()
+        return jsonify({"success": True, "message": "تمت إضافة قاعدة التطعيم.", "id": new_id})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/vaccinations/types/<int:type_id>', methods=['PUT'])
+def update_vaccination_type(type_id):
+    data = request.json or {}
+    conn = get_connection()
+    cursor = conn.cursor()
+    if not fetch_vaccination_type_or_404(cursor, type_id):
+        conn.close()
+        return jsonify({"success": False, "message": "قاعدة التطعيم غير موجودة."}), 404
+
+    updates = []
+    values = []
+    if 'name' in data:
+        name = (data.get('name') or '').strip()
+        if not name:
+            conn.close()
+            return jsonify({"success": False, "message": "الرجاء إدخال اسم التطعيم."}), 400
+        updates.append("name = ?")
+        values.append(name)
+    if 'interval_value' in data or 'interval_unit' in data:
+        row = fetch_vaccination_type_or_404(cursor, type_id)
+        merged = {
+            'interval_value': data.get('interval_value', row[2]),
+            'interval_unit': data.get('interval_unit', row[3]),
+        }
+        interval_value, interval_unit, interval_error = parse_vaccination_interval(merged)
+        if interval_error:
+            conn.close()
+            return jsonify({"success": False, "message": interval_error}), 400
+        updates.extend(["interval_value = ?", "interval_unit = ?"])
+        values.extend([interval_value, interval_unit])
+    if 'applies_to_sheep_type' in data:
+        applies_to = (data.get('applies_to_sheep_type') or '').strip() or None
+        if applies_to and applies_to not in ('حملة', 'خروف'):
+            conn.close()
+            return jsonify({"success": False, "message": "نوع الخروف غير صالح."}), 400
+        updates.append("applies_to_sheep_type = ?")
+        values.append(applies_to)
+    if 'min_age_days' in data:
+        min_age_days, min_age_error = parse_min_age_days(data)
+        if min_age_error:
+            conn.close()
+            return jsonify({"success": False, "message": min_age_error}), 400
+        updates.append("min_age_days = ?")
+        values.append(min_age_days)
+    if 'notes' in data:
+        updates.append("notes = ?")
+        values.append((data.get('notes') or '').strip())
+    if 'is_active' in data:
+        updates.append("is_active = ?")
+        values.append(1 if data.get('is_active') else 0)
+
+    if not updates:
+        conn.close()
+        return jsonify({"success": False, "message": "لا توجد بيانات للتحديث."}), 400
+
+    values.append(type_id)
+    cursor.execute(f"UPDATE vaccination_types SET {', '.join(updates)} WHERE id = ?", values)
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True, "message": "تم تحديث قاعدة التطعيم."})
+
+@app.route('/api/vaccinations/types/<int:type_id>', methods=['DELETE'])
+def delete_vaccination_type(type_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        if not fetch_vaccination_type_or_404(cursor, type_id):
+            conn.close()
+            return jsonify({"success": False, "message": "قاعدة التطعيم غير موجودة."}), 404
+        cursor.execute("DELETE FROM vaccination_types WHERE id = ?", (type_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "تم حذف قاعدة التطعيم."})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/vaccinations/dashboard', methods=['GET'])
+def get_vaccination_dashboard():
+    due_by = request.args.get('due_by', '').strip() or None
+    conn = get_connection()
+    cursor = conn.cursor()
+    dashboard = build_vaccination_dashboard(cursor, due_by=due_by)
+    dashboard["all_types"] = fetch_vaccination_types(cursor)
+    dashboard["recent_records"] = fetch_vaccination_records(cursor, limit=50)
+    conn.close()
+    return jsonify(dashboard)
+
+@app.route('/api/vaccinations/records', methods=['POST'])
+def add_vaccination_record():
+    data = request.json or {}
+    try:
+        type_id = int(data.get('vaccination_type_id'))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "نوع التطعيم غير صالح."}), 400
+
+    administered_date = (data.get('administered_date') or '').strip()
+    if not administered_date:
+        administered_date = date.today().isoformat()
+    elif not parse_date(administered_date):
+        return jsonify({"success": False, "message": "تاريخ غير صالح."}), 400
+
+    tag_ids = data.get('sheep_tag_ids') or []
+    if not tag_ids:
+        single_tag, tag_error = normalize_tag_id(data.get('sheep_tag_id', ''))
+        if tag_error:
+            return jsonify({"success": False, "message": tag_error}), 400
+        if not single_tag:
+            return jsonify({"success": False, "message": "الرجاء اختيار خروف واحد على الأقل."}), 400
+        tag_ids = [single_tag]
+    else:
+        normalized = []
+        for raw in tag_ids:
+            tag_id, tag_error = normalize_tag_id(raw)
+            if tag_error:
+                return jsonify({"success": False, "message": tag_error}), 400
+            if tag_id:
+                normalized.append(tag_id)
+        tag_ids = list(dict.fromkeys(normalized))
+        if not tag_ids:
+            return jsonify({"success": False, "message": "الرجاء اختيار خروف واحد على الأقل."}), 400
+
+    dose = (data.get('dose') or '').strip()
+    batch_number = (data.get('batch_number') or '').strip()
+    notes = (data.get('notes') or '').strip()
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        if not fetch_vaccination_type_or_404(cursor, type_id):
+            conn.close()
+            return jsonify({"success": False, "message": "نوع التطعيم غير موجود."}), 404
+
+        inserted = 0
+        for tag_id in tag_ids:
+            cursor.execute("SELECT status FROM sheep WHERE tag_id = ?", (tag_id,))
+            sheep_row = cursor.fetchone()
+            if not sheep_row:
+                conn.rollback()
+                conn.close()
+                return jsonify({"success": False, "message": f"رقم الخروف '{tag_id}' غير موجود."}), 400
+            if sheep_row[0] != 'حي':
+                conn.rollback()
+                conn.close()
+                return jsonify({"success": False, "message": f"يمكن تطعيم الحيوانات الأحياء فقط (رقم {tag_id})."}), 400
+            cursor.execute(
+                "INSERT INTO vaccination_records (vaccination_type_id, sheep_tag_id, administered_date, dose, batch_number, notes, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (type_id, tag_id, administered_date, dose, batch_number, notes, now_iso()),
+            )
+            inserted += 1
+        conn.commit()
+        conn.close()
+        message = f"تم تسجيل التطعيم لـ {inserted} رأس." if inserted > 1 else "تم تسجيل التطعيم."
+        return jsonify({"success": True, "message": message, "count": inserted})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/vaccinations/records/<int:record_id>', methods=['DELETE'])
+def delete_vaccination_record(record_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM vaccination_records WHERE id = ?", (record_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({"success": False, "message": "سجل التطعيم غير موجود."}), 404
+        cursor.execute("DELETE FROM vaccination_records WHERE id = ?", (record_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "تم حذف سجل التطعيم."})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
