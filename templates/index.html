@@ -349,6 +349,45 @@
         </div>
     </div>
 
+    <!-- Health entry modal -->
+    <div id="healthModal" class="fixed inset-0 bg-stone-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300" onclick="closeHealthModal()">
+        <div class="bg-white border border-stone-200 w-full max-w-md p-6 rounded-xl shadow-2xl relative mx-4 text-right" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between border-b border-stone-200 pb-3 mb-4">
+                <button onclick="closeHealthModal()" class="text-stone-400 hover:text-stone-700 font-bold text-lg">&times;</button>
+                <h3 id="healthModalTitle" class="text-lg font-bold text-amber-700">تسجيل مرض</h3>
+            </div>
+            <form id="healthForm" class="space-y-4">
+                <input type="hidden" id="healthMode" value="illness">
+                <input type="hidden" id="healthTagId" value="">
+                <input type="hidden" id="healthIllnessId" value="">
+                <div>
+                    <label id="healthDateLabel" class="block text-sm font-medium mb-1 text-stone-700">تاريخ بداية المرض</label>
+                    <input type="date" id="healthDate" required class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500">
+                </div>
+                <div id="healthDiagnosisGroup">
+                    <label class="block text-sm font-medium mb-1 text-stone-700">التشخيص / نوع المرض <span class="text-stone-400 font-normal">(اختياري)</span></label>
+                    <input type="text" id="healthDiagnosis" placeholder="مثال: التهاب رئوي"
+                        class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500">
+                </div>
+                <div id="healthDrugGroup" class="hidden">
+                    <label class="block text-sm font-medium mb-1 text-stone-700">اسم الدواء</label>
+                    <input type="text" id="healthDrugName" placeholder="مثال: أوكسي تتراسيكلين"
+                        class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500">
+                </div>
+                <div id="healthDoseGroup" class="hidden">
+                    <label class="block text-sm font-medium mb-1 text-stone-700">الجرعة <span class="text-stone-400 font-normal">(اختياري)</span></label>
+                    <input type="text" id="healthDose" placeholder="مثال: 5 مل"
+                        class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-stone-700">ملاحظات</label>
+                    <textarea id="healthNotes" rows="3" placeholder="ملاحظات اختيارية..." class="w-full bg-white border border-stone-300 rounded-lg p-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500 text-sm resize-none"></textarea>
+                </div>
+                <button type="submit" id="healthSubmitBtn" class="w-full bg-amber-600 hover:bg-amber-700 transition font-bold py-3 px-4 rounded-lg text-white">حفظ</button>
+            </form>
+        </div>
+    </div>
+
     <!-- Toast container -->
     <div id="toastContainer" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center pointer-events-none w-full max-w-sm px-4"></div>
 
@@ -365,6 +404,8 @@
         let expandedCards = new Set();
         let expandedActiveReproSections = new Set();
         let expandedPastReproSections = new Set();
+        let expandedActiveHealthSections = new Set();
+        let expandedPastHealthSections = new Set();
         let pendingPhotoFile = null;
         let removeExistingPhoto = false;
         let existingPhotoUrl = null;
@@ -767,6 +808,8 @@
                 sold: 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200',
                 pregnant: 'bg-lime-100 text-lime-800 ring-1 ring-lime-200',
                 notPregnant: 'bg-stone-100 text-stone-600',
+                ill: 'bg-amber-100 text-amber-800 ring-1 ring-amber-200',
+                healthy: 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80',
             };
             return `<span class="inline-flex text-xs font-semibold px-2.5 py-0.5 rounded-full ${classes[variant] || classes.default}">${escapeHtml(text)}</span>`;
         }
@@ -785,6 +828,7 @@
         function detailSection(title, bodyHtml, accent = 'lime') {
             const accents = {
                 lime: 'border-r-lime-500',
+                amber: 'border-r-amber-500',
                 stone: 'border-r-stone-300',
             };
             return `
@@ -936,6 +980,159 @@
                 ${pastBlock}
                 ${emptyState}
             `);
+        }
+
+        function renderHealthNoteInput(type, id, notes) {
+            const safeNotes = escapeHtml(notes || '');
+            return `
+                <input type="text"
+                    data-health-note="${type}"
+                    data-id="${id}"
+                    data-original="${safeNotes}"
+                    value="${safeNotes}"
+                    placeholder="ملاحظة..."
+                    onclick="event.stopPropagation()"
+                    class="w-full text-xs bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-stone-700 placeholder:text-stone-400 outline-none focus:ring-2 focus:ring-amber-500/25 focus:border-amber-400">
+            `;
+        }
+
+        function healthStatusLabel(sheep) {
+            return sheep.health_status || 'سليم';
+        }
+
+        function healthStatusVariant(sheep) {
+            return healthStatusLabel(sheep) === 'مريض' ? 'ill' : 'healthy';
+        }
+
+        function healthToggleBtn(label, tagId, isExpanded, scope) {
+            return `
+                <button data-action="toggle-health" data-scope="${scope}" data-tag="${tagId}"
+                    class="w-full flex items-center justify-between gap-2 text-xs font-semibold text-amber-800 hover:text-amber-900 bg-amber-50/70 hover:bg-amber-100 border border-amber-200/80 rounded-lg px-3 py-2 transition text-right">
+                    <span>${label}</span>
+                    <span class="transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''} text-amber-500 shrink-0">▼</span>
+                </button>`;
+        }
+
+        function toggleHealthSection(tagId, scope) {
+            const set = scope === 'active' ? expandedActiveHealthSections : expandedPastHealthSections;
+            if (set.has(tagId)) {
+                set.delete(tagId);
+            } else {
+                set.add(tagId);
+            }
+            applyFilters();
+        }
+
+        function renderMedicationRow(med) {
+            const dose = med.dose ? `<span class="text-stone-500"> · ${escapeHtml(med.dose)}</span>` : '';
+            return `
+                <div class="mr-4 pr-3 border-r-2 border-amber-500 space-y-1.5">
+                    <div class="flex items-start justify-between gap-2">
+                        <button data-action="delete-medication" data-id="${med.id}" class="text-stone-400 hover:text-red-600 text-xs shrink-0 mt-0.5" title="حذف">×</button>
+                        <p class="flex-1 text-sm text-right leading-relaxed">
+                            <span class="text-stone-500">دواء</span>
+                            <span class="font-bold text-stone-900 mx-1">${escapeHtml(med.administered_date)}</span>
+                            <span class="text-stone-300">—</span>
+                            <span class="font-semibold text-stone-900">${escapeHtml(med.drug_name)}</span>${dose}
+                        </p>
+                    </div>
+                    ${med.notes ? `<p class="text-xs text-stone-500 mr-4">${escapeHtml(med.notes)}</p>` : ''}
+                </div>`;
+        }
+
+        function renderIllnessRecord(illness, sheep, { isActive = false, compact = false } = {}) {
+            const safeTag = escapeHtml(sheep.tag_id);
+            const diagnosis = illness.diagnosis
+                ? `<span class="text-xs text-stone-500"> · ${escapeHtml(illness.diagnosis)}</span>`
+                : '';
+            const resolvedTag = illness.resolved_date
+                ? '<span class="text-xs text-stone-400 mr-2">(تعافى)</span>'
+                : '';
+            const deleteBtn = `<button data-action="delete-illness" data-id="${illness.id}" class="text-xs text-stone-400 hover:text-red-600 transition shrink-0" title="حذف">حذف</button>`;
+            const medicationRows = (illness.medications || []).map(renderMedicationRow).join('');
+            const shellClass = isActive
+                ? 'border border-amber-200 rounded-xl p-3.5 bg-amber-50/40'
+                : compact
+                    ? 'py-3 border-b-2 border-amber-500 last:border-0'
+                    : 'bg-stone-50/50 border border-stone-200 rounded-xl p-3.5';
+
+            let actionsHtml = '';
+            if (isActive) {
+                actionsHtml = `
+                    <div class="flex flex-wrap gap-2 mt-3 justify-end">
+                        <button data-action="add-medication" data-id="${illness.id}" data-tag="${safeTag}" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition">+ دواء</button>
+                        <button data-action="resolve-illness" data-id="${illness.id}" class="text-xs font-medium px-3 py-1.5 rounded-lg border border-stone-200 text-stone-700 hover:bg-stone-50 transition">تسجيل التعافي</button>
+                    </div>`;
+            }
+
+            return `
+                <div class="${shellClass}">
+                    <div class="flex justify-between items-start gap-3">
+                        <div class="text-right flex-1 min-w-0">
+                            <p class="text-sm leading-snug">
+                                <span class="text-stone-500">مرض</span>
+                                <span class="text-base font-bold text-stone-900 mx-1">${escapeHtml(illness.onset_date)}</span>
+                                ${resolvedTag}${diagnosis}
+                            </p>
+                        </div>
+                        ${deleteBtn}
+                    </div>
+                    ${medicationRows ? `<div class="mt-2.5 space-y-2">${medicationRows}</div>` : (isActive ? '<p class="mt-2 text-xs text-stone-500">لم يُسجَّل دواء بعد</p>' : '')}
+                    <div class="mt-2.5">${renderHealthNoteInput('illness', illness.id, illness.notes)}</div>
+                    ${actionsHtml}
+                </div>`;
+        }
+
+        function renderHealthSection(sheep) {
+            const safeTag = escapeHtml(sheep.tag_id);
+            const illnesses = sheep.illnesses || [];
+            const status = healthStatusLabel(sheep);
+            const statusVariant = healthStatusVariant(sheep);
+            const isActiveExpanded = expandedActiveHealthSections.has(sheep.tag_id);
+            const isHistoryExpanded = expandedPastHealthSections.has(sheep.tag_id);
+            const isLive = (sheep.status || 'حي') === 'حي';
+
+            const activeIllnesses = illnesses.filter(i => !i.resolved_date);
+            const pastIllnesses = illnesses.filter(i => i.resolved_date);
+            const hasActiveIllnesses = activeIllnesses.length > 0;
+            const hasPastIllnesses = pastIllnesses.length > 0;
+
+            const activeBlock = hasActiveIllnesses ? `
+                <div class="py-3 border-b border-stone-100">
+                    ${healthToggleBtn(isActiveExpanded ? 'إخفاء المرض الحالي' : 'عرض المرض الحالي', safeTag, isActiveExpanded, 'active')}
+                    <div class="${isActiveExpanded ? 'mt-3 space-y-3' : 'hidden'}">
+                        ${activeIllnesses.map(i => renderIllnessRecord(i, sheep, { isActive: true })).join('')}
+                    </div>
+                </div>` : '';
+
+            const pastBlock = hasPastIllnesses ? `
+                <div class="pt-3">
+                    ${healthToggleBtn(isHistoryExpanded ? 'إخفاء السجلات السابقة' : `عرض السجلات السابقة (${pastIllnesses.length})`, safeTag, isHistoryExpanded, 'past')}
+                    <div class="${isHistoryExpanded ? 'mt-3 space-y-0' : 'hidden'}">
+                        ${pastIllnesses.map(i => renderIllnessRecord(i, sheep, { compact: true })).join('')}
+                    </div>
+                </div>` : '';
+
+            const emptyState = !illnesses.length
+                ? '<p class="py-3 text-sm text-stone-400">لا توجد سجلات مرض بعد</p>'
+                : '';
+
+            const addBtn = isLive
+                ? `<button data-action="add-illness" data-tag="${safeTag}" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition shrink-0">+ مرض</button>`
+                : '';
+
+            return detailSection('الصحة والمرض', `
+                <div class="py-3 flex items-center justify-between gap-3 border-b border-stone-100">
+                    <div class="text-right">
+                        <span class="text-xs text-stone-500 block mb-1">الحالة</span>
+                        ${statusPill(status, statusVariant)}
+                    </div>
+                    ${addBtn}
+                </div>
+                ${activeBlock}
+                ${pastBlock}
+                ${emptyState}
+            `, 'amber');
         }
 
         function renderActiveCycleAgeFilters() {
@@ -1524,6 +1721,7 @@
                     : `<p class="py-3 text-sm text-stone-400">لا توجد ملاحظات</p>`;
 
                 const reproSection = renderReproductionSection(s);
+                const healthSection = renderHealthSection(s);
                 const expandedBody = `
                     <div class="space-y-3 min-w-0">
                         ${s.photo_url ? `
@@ -1535,6 +1733,7 @@
                         ${familyRows ? detailSection('النسب والأبناء', familyRows) : ''}
                         ${purchaseSection}
                         ${reproSection}
+                        ${healthSection}
                         ${detailSection('ملاحظات إضافية', notesBody)}
                     </div>`;
 
@@ -1555,6 +1754,7 @@
                                 <div class="flex items-baseline gap-2 flex-wrap justify-start">
                                     <span class="text-xl font-bold text-stone-900 tracking-tight">${safeTag}</span>
                                     ${isSold ? `<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">مباع</span>` : ''}
+                                    ${!isSold && !isDead && s.health_status === 'مريض' ? `<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">مريض</span>` : ''}
                                 </div>
                             </div>
                         </div>
@@ -1639,6 +1839,117 @@
             const modal = document.getElementById('reproModal');
             modal.classList.add('opacity-0');
             setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function openHealthModal(mode, tagId, illnessId = '') {
+            document.getElementById('healthMode').value = mode;
+            document.getElementById('healthTagId').value = tagId;
+            document.getElementById('healthIllnessId').value = illnessId;
+            document.getElementById('healthDate').value = todayDateString();
+            document.getElementById('healthNotes').value = '';
+            document.getElementById('healthDiagnosis').value = '';
+            document.getElementById('healthDrugName').value = '';
+            document.getElementById('healthDose').value = '';
+
+            const diagnosisGroup = document.getElementById('healthDiagnosisGroup');
+            const drugGroup = document.getElementById('healthDrugGroup');
+            const doseGroup = document.getElementById('healthDoseGroup');
+            const title = document.getElementById('healthModalTitle');
+            const dateLabel = document.getElementById('healthDateLabel');
+            const submitBtn = document.getElementById('healthSubmitBtn');
+            const drugInput = document.getElementById('healthDrugName');
+
+            if (mode === 'medication') {
+                title.innerText = 'تسجيل دواء';
+                dateLabel.innerText = 'تاريخ إعطاء الدواء';
+                diagnosisGroup.classList.add('hidden');
+                drugGroup.classList.remove('hidden');
+                doseGroup.classList.remove('hidden');
+                drugInput.required = true;
+                submitBtn.innerText = 'حفظ الدواء';
+            } else {
+                title.innerText = 'تسجيل مرض';
+                dateLabel.innerText = 'تاريخ بداية المرض';
+                diagnosisGroup.classList.remove('hidden');
+                drugGroup.classList.add('hidden');
+                doseGroup.classList.add('hidden');
+                drugInput.required = false;
+                submitBtn.innerText = 'حفظ المرض';
+            }
+
+            const modal = document.getElementById('healthModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        }
+
+        function closeHealthModal() {
+            const modal = document.getElementById('healthModal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        async function saveHealthNote(input) {
+            const id = input.dataset.id;
+            const notes = input.value.trim();
+            const original = input.dataset.original || '';
+            if (notes === original) return;
+
+            try {
+                const response = await fetch(`/api/illnesses/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notes }),
+                });
+                const data = await response.json();
+                if (data.success !== false) {
+                    input.dataset.original = notes;
+                    showToast('تم حفظ الملاحظة', 'success');
+                } else {
+                    showToast(data.message, 'error');
+                }
+            } catch (err) {
+                showToast('تعذر حفظ الملاحظة', 'error');
+            }
+        }
+
+        async function deleteIllness(illnessId) {
+            if (!confirm('هل أنت متأكد من حذف سجل المرض؟')) return;
+            try {
+                const response = await fetch(`/api/illnesses/${illnessId}`, { method: 'DELETE' });
+                const data = await response.json();
+                showToast(data.message, data.success !== false ? 'success' : 'error');
+                if (data.success !== false) fetchSheep();
+            } catch (err) {
+                showToast('تعذر حذف سجل المرض', 'error');
+            }
+        }
+
+        async function resolveIllness(illnessId) {
+            if (!confirm('تسجيل تعافي الخروف من هذا المرض؟')) return;
+            try {
+                const response = await fetch(`/api/illnesses/${illnessId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ resolved_date: todayDateString() }),
+                });
+                const data = await response.json();
+                showToast(data.message, data.success !== false ? 'success' : 'error');
+                if (data.success !== false) fetchSheep();
+            } catch (err) {
+                showToast('تعذر تسجيل التعافي', 'error');
+            }
+        }
+
+        async function deleteMedication(medicationId) {
+            if (!confirm('هل أنت متأكد من حذف سجل الدواء؟')) return;
+            try {
+                const response = await fetch(`/api/medications/${medicationId}`, { method: 'DELETE' });
+                const data = await response.json();
+                showToast(data.message, data.success !== false ? 'success' : 'error');
+                if (data.success !== false) fetchSheep();
+            } catch (err) {
+                showToast('تعذر حذف سجل الدواء', 'error');
+            }
         }
 
         async function saveReproNote(input) {
@@ -1780,6 +2091,8 @@
                 expandedCards.delete(tagId);
                 expandedActiveReproSections.delete(tagId);
                 expandedPastReproSections.delete(tagId);
+                expandedActiveHealthSections.delete(tagId);
+                expandedPastHealthSections.delete(tagId);
                 fetchSheep();
             } catch (err) {
                 showToast('تعذر تنفيذ عملية الحذف', 'error');
@@ -1834,11 +2147,18 @@
                 e.preventDefault();
                 e.target.blur();
             }
+            if (e.target.matches('[data-health-note]') && e.key === 'Enter') {
+                e.preventDefault();
+                e.target.blur();
+            }
         });
 
         document.getElementById('sheepList').addEventListener('focusout', (e) => {
             if (e.target.matches('[data-repro-note]')) {
                 saveReproNote(e.target);
+            }
+            if (e.target.matches('[data-health-note]')) {
+                saveHealthNote(e.target);
             }
         });
 
@@ -1858,6 +2178,12 @@
                 else if (action === 'complete-mating') completeMating(id);
                 else if (action === 'delete-ultrasound') deleteUltrasound(id);
                 else if (action === 'toggle-repro') toggleReproSection(tag, actionBtn.dataset.scope || 'past');
+                else if (action === 'add-illness') openHealthModal('illness', tag);
+                else if (action === 'add-medication') openHealthModal('medication', tag, id);
+                else if (action === 'delete-illness') deleteIllness(id);
+                else if (action === 'resolve-illness') resolveIllness(id);
+                else if (action === 'delete-medication') deleteMedication(id);
+                else if (action === 'toggle-health') toggleHealthSection(tag, actionBtn.dataset.scope || 'past');
                 return;
             }
             const header = e.target.closest('.card-header');
@@ -1976,6 +2302,55 @@
                     closeReproModal();
                     expandedCards.add(tagId);
                     expandedActiveReproSections.add(tagId);
+                    fetchSheep();
+                }
+            } catch (err) {
+                showToast('تعذر حفظ السجل', 'error');
+            }
+        });
+
+        document.getElementById('healthForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const mode = document.getElementById('healthMode').value;
+            const tagId = document.getElementById('healthTagId').value;
+            const illnessId = document.getElementById('healthIllnessId').value;
+
+            let url;
+            let payload;
+            if (mode === 'medication') {
+                const drugName = document.getElementById('healthDrugName').value.trim();
+                if (!drugName) {
+                    showToast('الرجاء إدخال اسم الدواء.', 'error');
+                    return;
+                }
+                url = `/api/illnesses/${illnessId}/medications`;
+                payload = {
+                    administered_date: document.getElementById('healthDate').value,
+                    drug_name: drugName,
+                    dose: document.getElementById('healthDose').value.trim(),
+                    notes: document.getElementById('healthNotes').value.trim(),
+                };
+            } else {
+                url = `/api/sheep/${tagId}/illnesses`;
+                payload = {
+                    onset_date: document.getElementById('healthDate').value,
+                    diagnosis: document.getElementById('healthDiagnosis').value.trim(),
+                    notes: document.getElementById('healthNotes').value.trim(),
+                };
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await response.json();
+                showToast(result.message, result.success !== false ? 'success' : 'error');
+                if (result.success !== false) {
+                    closeHealthModal();
+                    expandedCards.add(tagId);
+                    expandedActiveHealthSections.add(tagId);
                     fetchSheep();
                 }
             } catch (err) {

@@ -101,6 +101,30 @@ def init_db():
     ultrasound_columns = {row[1] for row in cursor.fetchall()}
     if 'fetus_count' not in ultrasound_columns:
         cursor.execute("ALTER TABLE ultrasounds ADD COLUMN fetus_count INTEGER")
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS illnesses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sheep_tag_id TEXT NOT NULL,
+            onset_date TEXT NOT NULL,
+            resolved_date TEXT,
+            diagnosis TEXT,
+            notes TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (sheep_tag_id) REFERENCES sheep(tag_id) ON DELETE CASCADE
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS medications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            illness_id INTEGER NOT NULL,
+            administered_date TEXT NOT NULL,
+            drug_name TEXT NOT NULL,
+            dose TEXT,
+            notes TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (illness_id) REFERENCES illnesses(id) ON DELETE CASCADE
+        )
+    ''')
     cursor.execute("UPDATE sheep SET mother_status = 'أم' WHERE mother_status = 'آم'")
     cursor.execute("UPDATE sheep SET mother_status = 'ليس أم بعد' WHERE mother_status IN ('ليس ام بعد', 'غير محدد') OR mother_status IS NULL OR mother_status = ''")
     cursor.execute("UPDATE sheep SET status = 'حي' WHERE status IS NULL OR status = ''")
@@ -262,7 +286,13 @@ def mating_needs_review(mated_date, completed_at, ultrasounds):
         return False
     return (date.today() - mated).days >= MATING_REVIEW_DAYS
 
-def sheep_row_to_dict(row, matings=None):
+def compute_health_status(illnesses):
+    if any(i.get('resolved_date') is None for i in (illnesses or [])):
+        return 'مريض'
+    return 'سليم'
+
+def sheep_row_to_dict(row, matings=None, illnesses=None):
+    illnesses = illnesses or []
     return {
         "tag_id": row[0],
         "name": row[1],
@@ -280,6 +310,8 @@ def sheep_row_to_dict(row, matings=None):
         "pregnancy_status": row[13] or 'غير حامل',
         "photo_url": f"/uploads/sheep/{row[14]}" if row[14] else None,
         "matings": matings or [],
+        "illnesses": illnesses,
+        "health_status": compute_health_status(illnesses),
         "needs_mating_review": any(
             mating_needs_review(m.get('mated_date'), m.get('completed_at'), m.get('ultrasounds'))
             for m in (matings or [])
@@ -452,6 +484,44 @@ def fetch_matings_for_sheep(cursor, tag_id):
         })
     return matings
 
+def fetch_illnesses_for_sheep(cursor, tag_id):
+    cursor.execute('''
+        SELECT id, onset_date, resolved_date, diagnosis, notes, created_at
+        FROM illnesses
+        WHERE sheep_tag_id = ?
+        ORDER BY onset_date DESC, id DESC
+    ''', (tag_id,))
+    illnesses = []
+    for row in cursor.fetchall():
+        illness_id = row[0]
+        cursor.execute('''
+            SELECT id, administered_date, drug_name, dose, notes, created_at
+            FROM medications
+            WHERE illness_id = ?
+            ORDER BY administered_date DESC, id DESC
+        ''', (illness_id,))
+        medications = [
+            {
+                "id": m[0],
+                "administered_date": m[1],
+                "drug_name": m[2],
+                "dose": m[3] or '',
+                "notes": m[4] or '',
+                "created_at": m[5],
+            }
+            for m in cursor.fetchall()
+        ]
+        illnesses.append({
+            "id": illness_id,
+            "onset_date": row[1],
+            "resolved_date": row[2],
+            "diagnosis": row[3] or '',
+            "notes": row[4] or '',
+            "created_at": row[5],
+            "medications": medications,
+        })
+    return illnesses
+
 def get_sheep_or_404(cursor, tag_id):
     cursor.execute(SHEEP_SELECT + " WHERE tag_id = ?", (tag_id,))
     row = cursor.fetchone()
@@ -470,6 +540,31 @@ def validate_ewe_for_mating(cursor, tag_id):
     if row[1] != 'حي':
         return False, "لا يمكن تسجيل تلقيح إلا للحملات الأحياء."
     return True, None
+
+def validate_sheep_for_health(cursor, tag_id):
+    cursor.execute("SELECT status FROM sheep WHERE tag_id = ?", (tag_id,))
+    row = cursor.fetchone()
+    if not row:
+        return False, f"رقم الخروف '{tag_id}' غير موجود في السجل."
+    if row[0] != 'حي':
+        return False, "يمكن تسجيل المرض والأدوية للحيوانات الأحياء فقط."
+    return True, None
+
+def get_illness_or_404(cursor, illness_id):
+    cursor.execute(
+        "SELECT id, sheep_tag_id, onset_date, resolved_date, diagnosis, notes FROM illnesses WHERE id = ?",
+        (illness_id,),
+    )
+    return cursor.fetchone()
+
+def get_medication_or_404(cursor, medication_id):
+    cursor.execute('''
+        SELECT m.id, m.illness_id, i.sheep_tag_id
+        FROM medications m
+        JOIN illnesses i ON i.id = m.illness_id
+        WHERE m.id = ?
+    ''', (medication_id,))
+    return cursor.fetchone()
 
 def get_mating_or_404(cursor, mating_id):
     cursor.execute(
@@ -511,8 +606,10 @@ def get_sheep():
     rows = cursor.fetchall()
     result = []
     for row in rows:
-        matings = fetch_matings_for_sheep(cursor, row[0])
-        result.append(sheep_row_to_dict(row, matings))
+        tag_id = row[0]
+        matings = fetch_matings_for_sheep(cursor, tag_id)
+        illnesses = fetch_illnesses_for_sheep(cursor, tag_id)
+        result.append(sheep_row_to_dict(row, matings, illnesses))
     conn.close()
     return jsonify(result)
 
@@ -957,6 +1054,203 @@ def delete_ultrasound(ultrasound_id):
         conn.commit()
         conn.close()
         return jsonify({"success": True, "message": "تم حذف سجل السونار."})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/sheep/<tag_id>/illnesses', methods=['POST'])
+def add_illness(tag_id):
+    data = request.json or {}
+    onset_date = (data.get('onset_date') or '').strip()
+    diagnosis = (data.get('diagnosis') or '').strip()
+    notes = (data.get('notes') or '').strip()
+
+    if not onset_date:
+        return jsonify({"success": False, "message": "الرجاء إدخال تاريخ بداية المرض."}), 400
+    if not parse_date(onset_date):
+        return jsonify({"success": False, "message": "تاريخ بداية المرض غير صالح."}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        ok, message = validate_sheep_for_health(cursor, tag_id)
+        if not ok:
+            conn.close()
+            return jsonify({"success": False, "message": message}), 400
+
+        cursor.execute('''
+            INSERT INTO illnesses (sheep_tag_id, onset_date, diagnosis, notes, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (tag_id, onset_date, diagnosis, notes, now_iso()))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "تم تسجيل المرض بنجاح!"})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/illnesses/<int:illness_id>', methods=['PATCH'])
+def update_illness(illness_id):
+    data = request.json or {}
+    diagnosis = data.get('diagnosis')
+    notes = data.get('notes')
+    resolved_date = data.get('resolved_date')
+
+    if resolved_date is not None and resolved_date != '' and not parse_date(resolved_date):
+        return jsonify({"success": False, "message": "تاريخ التعافي غير صالح."}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        row = get_illness_or_404(cursor, illness_id)
+        if not row:
+            conn.close()
+            return jsonify({"success": False, "message": "سجل المرض غير موجود."}), 404
+
+        updates = []
+        values = []
+        if diagnosis is not None:
+            updates.append("diagnosis = ?")
+            values.append(diagnosis.strip())
+        if notes is not None:
+            updates.append("notes = ?")
+            values.append(notes.strip())
+        if resolved_date is not None:
+            updates.append("resolved_date = ?")
+            values.append(resolved_date.strip() if resolved_date else None)
+
+        if not updates:
+            conn.close()
+            return jsonify({"success": False, "message": "لا توجد بيانات للتحديث."}), 400
+
+        values.append(illness_id)
+        cursor.execute(
+            f"UPDATE illnesses SET {', '.join(updates)} WHERE id = ?",
+            values,
+        )
+        conn.commit()
+        conn.close()
+        if resolved_date:
+            return jsonify({"success": True, "message": "تم تسجيل التعافي."})
+        return jsonify({"success": True, "message": "تم حفظ التعديل."})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/illnesses/<int:illness_id>', methods=['DELETE'])
+def delete_illness(illness_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        row = get_illness_or_404(cursor, illness_id)
+        if not row:
+            conn.close()
+            return jsonify({"success": False, "message": "سجل المرض غير موجود."}), 404
+        cursor.execute("DELETE FROM illnesses WHERE id = ?", (illness_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "تم حذف سجل المرض."})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/illnesses/<int:illness_id>/medications', methods=['POST'])
+def add_medication(illness_id):
+    data = request.json or {}
+    administered_date = (data.get('administered_date') or '').strip()
+    drug_name = (data.get('drug_name') or '').strip()
+    dose = (data.get('dose') or '').strip()
+    notes = (data.get('notes') or '').strip()
+
+    if not administered_date:
+        return jsonify({"success": False, "message": "الرجاء إدخال تاريخ إعطاء الدواء."}), 400
+    if not parse_date(administered_date):
+        return jsonify({"success": False, "message": "تاريخ إعطاء الدواء غير صالح."}), 400
+    if not drug_name:
+        return jsonify({"success": False, "message": "الرجاء إدخال اسم الدواء."}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        row = get_illness_or_404(cursor, illness_id)
+        if not row:
+            conn.close()
+            return jsonify({"success": False, "message": "سجل المرض غير موجود."}), 404
+        ok, message = validate_sheep_for_health(cursor, row[1])
+        if not ok:
+            conn.close()
+            return jsonify({"success": False, "message": message}), 400
+
+        cursor.execute('''
+            INSERT INTO medications (illness_id, administered_date, drug_name, dose, notes, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (illness_id, administered_date, drug_name, dose, notes, now_iso()))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "تم تسجيل الدواء بنجاح!"})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/medications/<int:medication_id>', methods=['PATCH'])
+def update_medication(medication_id):
+    data = request.json or {}
+    administered_date = data.get('administered_date')
+    drug_name = data.get('drug_name')
+    dose = data.get('dose')
+    notes = data.get('notes')
+
+    if administered_date is not None and not parse_date(administered_date):
+        return jsonify({"success": False, "message": "تاريخ إعطاء الدواء غير صالح."}), 400
+    if drug_name is not None and not drug_name.strip():
+        return jsonify({"success": False, "message": "اسم الدواء لا يمكن أن يكون فارغاً."}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        row = get_medication_or_404(cursor, medication_id)
+        if not row:
+            conn.close()
+            return jsonify({"success": False, "message": "سجل الدواء غير موجود."}), 404
+
+        updates = []
+        values = []
+        if administered_date is not None:
+            updates.append("administered_date = ?")
+            values.append(administered_date.strip())
+        if drug_name is not None:
+            updates.append("drug_name = ?")
+            values.append(drug_name.strip())
+        if dose is not None:
+            updates.append("dose = ?")
+            values.append(dose.strip())
+        if notes is not None:
+            updates.append("notes = ?")
+            values.append(notes.strip())
+
+        if not updates:
+            conn.close()
+            return jsonify({"success": False, "message": "لا توجد بيانات للتحديث."}), 400
+
+        values.append(medication_id)
+        cursor.execute(
+            f"UPDATE medications SET {', '.join(updates)} WHERE id = ?",
+            values,
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "تم تحديث سجل الدواء."})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/medications/<int:medication_id>', methods=['DELETE'])
+def delete_medication(medication_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        row = get_medication_or_404(cursor, medication_id)
+        if not row:
+            conn.close()
+            return jsonify({"success": False, "message": "سجل الدواء غير موجود."}), 404
+        cursor.execute("DELETE FROM medications WHERE id = ?", (medication_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "تم حذف سجل الدواء."})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
