@@ -4,25 +4,18 @@ from datetime import date, datetime, timedelta
 from werkzeug.utils import secure_filename
 
 from db import IntegrityError, get_connection
+from storage import UPLOAD_FOLDER, delete_sheep_photo, ensure_upload_folder, photo_public_url, save_sheep_photo
 
 app = Flask(__name__)
 MATING_REVIEW_DAYS = 20
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'sheep')
 ALLOWED_PHOTO_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp', 'gif'}
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
-
-def ensure_upload_folder():
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def allowed_photo(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_PHOTO_EXTENSIONS
 
-def delete_sheep_photo_file(filename):
-    if not filename:
-        return
-    path = os.path.join(UPLOAD_FOLDER, filename)
-    if os.path.isfile(path):
-        os.remove(path)
+def delete_sheep_photo_file(stored_value):
+    delete_sheep_photo(stored_value)
 
 def init_db():
     """Initializes the PostgreSQL schema and seed data."""
@@ -287,7 +280,7 @@ def sheep_row_to_dict(row, matings=None, illnesses=None):
         "status": row[11],
         "child_count": row[12],
         "pregnancy_status": row[13] or 'غير حامل',
-        "photo_url": f"/uploads/sheep/{row[14]}" if row[14] else None,
+        "photo_url": photo_public_url(row[14]),
         "matings": matings or [],
         "illnesses": illnesses,
         "health_status": compute_health_status(illnesses),
@@ -742,19 +735,15 @@ def upload_sheep_photo(tag_id):
             conn.close()
             return jsonify({"success": False, "message": f"رقم الخروف '{tag_id}' غير موجود في السجل."}), 404
 
-        ext = file.filename.rsplit('.', 1)[1].lower()
-        safe_tag = secure_filename(tag_id) or 'sheep'
-        filename = f"{safe_tag}.{ext}"
         delete_sheep_photo_file(row[0])
-        ensure_upload_folder()
-        file.save(os.path.join(UPLOAD_FOLDER, filename))
-        cursor.execute("UPDATE sheep SET photo_filename = %s WHERE tag_id = %s", (filename, tag_id))
+        stored_value = save_sheep_photo(tag_id, file)
+        cursor.execute("UPDATE sheep SET photo_filename = %s WHERE tag_id = %s", (stored_value, tag_id))
         conn.commit()
         conn.close()
         return jsonify({
             "success": True,
             "message": "تم رفع الصورة بنجاح!",
-            "photo_url": f"/uploads/sheep/{filename}",
+            "photo_url": photo_public_url(stored_value),
         })
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
