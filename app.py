@@ -1807,18 +1807,22 @@ def fetch_last_vaccinations_by_sheep(cursor):
         last_by_key[(type_id, tag_id)] = {"last_date": last_date, "record_id": record_id}
     return last_by_key
 
-def fetch_vaccination_records(cursor, limit=None):
+def fetch_vaccination_records(cursor, limit=None, sheep_tag_id=None):
     query = '''
         SELECT r.id, r.vaccination_type_id, t.name, r.sheep_tag_id, s.name,
                r.administered_date, r.dose, r.batch_number, r.notes, r.created_at
         FROM vaccination_records r
         JOIN vaccination_types t ON t.id = r.vaccination_type_id
         LEFT JOIN sheep s ON s.tag_id = r.sheep_tag_id
-        ORDER BY r.administered_date DESC, r.id DESC
     '''
+    params = []
+    if sheep_tag_id:
+        query += " WHERE r.sheep_tag_id = ?"
+        params.append(sheep_tag_id)
+    query += " ORDER BY r.administered_date DESC, r.id DESC"
     if limit:
         query += f" LIMIT {int(limit)}"
-    cursor.execute(query)
+    cursor.execute(query, params)
     return [
         {
             "id": row[0],
@@ -2032,6 +2036,33 @@ def get_vaccination_dashboard():
     dashboard["recent_records"] = fetch_vaccination_records(cursor, limit=50)
     conn.close()
     return jsonify(dashboard)
+
+@app.route('/api/vaccinations/records', methods=['GET'])
+def get_vaccination_records():
+    sheep_tag_id = (request.args.get('sheep_tag_id') or '').strip() or None
+    conn = get_connection()
+    cursor = conn.cursor()
+    if sheep_tag_id:
+        cursor.execute("SELECT tag_id, name, breed, sheep_type FROM sheep WHERE tag_id = ?", (sheep_tag_id,))
+        sheep_row = cursor.fetchone()
+        if not sheep_row:
+            conn.close()
+            return jsonify({"success": False, "message": "الخروف غير موجود."}), 404
+        records = fetch_vaccination_records(cursor, sheep_tag_id=sheep_tag_id)
+        conn.close()
+        return jsonify({
+            "sheep": {
+                "tag_id": sheep_row[0],
+                "name": sheep_row[1],
+                "breed": sheep_row[2],
+                "sheep_type": sheep_row[3],
+            },
+            "records": records,
+            "total": len(records),
+        })
+    records = fetch_vaccination_records(cursor, limit=100)
+    conn.close()
+    return jsonify({"records": records, "total": len(records)})
 
 @app.route('/api/vaccinations/records', methods=['POST'])
 def add_vaccination_record():

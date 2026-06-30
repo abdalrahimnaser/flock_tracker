@@ -63,9 +63,46 @@
         .status-not_applicable { background: #f5f5f4; color: #78716c; }
         .sheep-card { transition: box-shadow 0.15s ease; }
         .sheep-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+        .sheep-card.expanded { box-shadow: 0 4px 12px rgba(2,132,199,0.08); border-color: #bae6fd; }
+        .sheep-card .expand-chevron { transition: transform 0.2s ease; }
+        .sheep-card.expanded .expand-chevron { transform: rotate(180deg); }
         .rule-card { border-right: 4px solid #0284c7; }
         .record-row + .record-row { border-top: 1px solid #f5f5f4; }
         .sheep-pick.selected { background: #e0f2fe; border-color: #0284c7; }
+        .timeline-group + .timeline-group { margin-top: 1.25rem; }
+        .timeline-item { position: relative; padding-right: 1.25rem; padding-bottom: 0.75rem; }
+        .timeline-item:not(:last-child)::before {
+            content: '';
+            position: absolute;
+            right: 0.3125rem;
+            top: 0.625rem;
+            bottom: 0;
+            width: 2px;
+            background: #e7e5e4;
+        }
+        .timeline-item::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0.375rem;
+            width: 0.625rem;
+            height: 0.625rem;
+            border-radius: 9999px;
+            background: #0284c7;
+            border: 2px solid white;
+            box-shadow: 0 0 0 1px #bae6fd;
+        }
+        .vax-status-card { border-radius: 0.625rem; background: #fafaf9; border: 1px solid #f5f5f4; padding: 0.75rem; }
+        .vax-date-cell {
+            border-radius: 0.5rem;
+            background: white;
+            border: 1px solid #f5f5f4;
+            padding: 0.5rem 0.625rem;
+            min-width: 0;
+        }
+        .vax-date-cell .label { font-size: 0.625rem; color: #a8a29e; margin-bottom: 0.125rem; }
+        .vax-date-cell .value { font-size: 0.8125rem; font-weight: 600; color: #44403c; }
+        .vax-date-cell.overdue .value { color: #b91c1c; }
     </style>
 </head>
 <body class="text-stone-800 min-h-screen font-sans relative pb-24">
@@ -87,7 +124,7 @@
     <div class="container mx-auto p-4 max-w-4xl">
         <header class="my-4 sm:my-6 text-center">
             <h1 class="text-2xl sm:text-3xl font-bold text-sky-700">تطعيمات القطيع</h1>
-            <p class="text-stone-500 text-sm mt-1">قواعد التطعيم، السجل، ومتابعة المواعيد</p>
+            <p class="text-stone-500 text-sm mt-1">تسجيل، متابعة المواعيد، وسجل كل خروف</p>
         </header>
 
         <div id="statsBar" class="bg-white border border-stone-200 rounded-xl shadow-sm mb-4 sm:mb-6 grid grid-cols-3 divide-x divide-stone-100">
@@ -97,7 +134,7 @@
             </div>
             <div class="text-center py-3.5 sm:py-4 px-3">
                 <div id="statOk" class="text-xl sm:text-2xl font-bold text-emerald-600 num">—</div>
-                <div class="text-xs text-stone-500 mt-0.5">في الموعد</div>
+                <div class="text-xs text-stone-500 mt-0.5">ضمن الجدول</div>
             </div>
             <div class="text-center py-3.5 sm:py-4 px-3">
                 <div id="statNever" class="text-xl sm:text-2xl font-bold text-indigo-600 num">—</div>
@@ -105,11 +142,22 @@
             </div>
         </div>
 
+        <div id="recentActivityBar" class="bg-white border border-stone-200 rounded-xl shadow-sm mb-4 overflow-hidden">
+            <button type="button" id="recentActivityToggle" aria-expanded="false"
+                class="flex items-center justify-between w-full text-sm font-medium text-stone-700 hover:bg-stone-50 px-4 py-3 transition">
+                <span>آخر النشاط <span id="recentCount" class="text-stone-400 font-normal text-xs"></span></span>
+                <span id="recentChevron" class="text-stone-400 text-[10px] transition-transform">▼</span>
+            </button>
+            <div id="recentActivityPanel" class="hidden border-t border-stone-100 px-4 pb-3 max-h-52 overflow-y-auto">
+                <div id="historyList"></div>
+                <div id="historyEmpty" class="hidden text-center py-6 text-stone-500 text-sm">لا توجد تطعيمات مسجّلة بعد</div>
+            </div>
+        </div>
+
         <div class="flex gap-2 mb-4 overflow-x-auto pb-1">
             <button type="button" data-section="log" class="section-tab selected shrink-0 px-4 py-2 rounded-lg border border-stone-200 text-sm font-medium transition">تسجيل تطعيم</button>
+            <button type="button" data-section="status" class="section-tab shrink-0 px-4 py-2 rounded-lg border border-stone-200 text-sm font-medium text-stone-600 transition hover:bg-stone-50">متابعة القطيع</button>
             <button type="button" data-section="rules" class="section-tab shrink-0 px-4 py-2 rounded-lg border border-stone-200 text-sm font-medium text-stone-600 transition hover:bg-stone-50">قواعد التطعيم</button>
-            <button type="button" data-section="status" class="section-tab shrink-0 px-4 py-2 rounded-lg border border-stone-200 text-sm font-medium text-stone-600 transition hover:bg-stone-50">حالة القطيع</button>
-            <button type="button" data-section="history" class="section-tab shrink-0 px-4 py-2 rounded-lg border border-stone-200 text-sm font-medium text-stone-600 transition hover:bg-stone-50">السجل</button>
         </div>
 
         <!-- Log vaccination -->
@@ -221,10 +269,10 @@
             </div>
         </section>
 
-        <!-- Status -->
+        <!-- Flock tracking (status + per-sheep history) -->
         <section id="sectionStatus" class="hidden bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-stone-200 mb-4">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <h2 class="text-base sm:text-lg font-bold">حالة التطعيمات</h2>
+                <h2 class="text-base sm:text-lg font-bold">متابعة القطيع</h2>
                 <p id="statusCount" class="text-xs text-stone-500"></p>
             </div>
 
@@ -273,13 +321,6 @@
             <div id="sheepStatusList" class="space-y-3"></div>
             <div id="statusEmpty" class="hidden text-center py-12 text-stone-500 text-sm">لا توجد نتائج مطابقة</div>
         </section>
-
-        <!-- History -->
-        <section id="sectionHistory" class="hidden bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-stone-200 mb-4">
-            <h2 class="text-base sm:text-lg font-bold mb-4">سجل التطعيمات</h2>
-            <div id="historyList"></div>
-            <div id="historyEmpty" class="hidden text-center py-12 text-stone-500 text-sm">لا توجد تطعيمات مسجّلة بعد</div>
-        </section>
     </div>
 
     <div id="toastContainer" class="fixed bottom-6 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
@@ -294,11 +335,15 @@
         let activeGenderFilter = '';
         let activeBreedFilter = '';
         let dueByFilter = '';
+        let expandedSheep = new Set();
+        let sheepHistoryData = {};
+        let sheepHistoryLoading = new Set();
+        let recentActivityExpanded = false;
 
         const STATUS_LABELS = {
             overdue: 'متأخر',
             never: 'لم يُطعَّم',
-            ok: 'في الموعد',
+            ok: 'ضمن الجدول',
             not_applicable: 'لا ينطبق',
         };
         const UNIT_LABELS = { days: 'يوم', months: 'شهر', years: 'سنة' };
@@ -311,7 +356,7 @@
             { value: '', label: 'الكل' },
             { value: 'overdue', label: 'متأخر' },
             { value: 'never', label: 'لم يُطعَّم' },
-            { value: 'ok', label: 'في الموعد' },
+            { value: 'ok', label: 'ضمن الجدول' },
         ];
 
         function escapeHtml(str) {
@@ -372,7 +417,7 @@
                 btn.classList.toggle('text-stone-600', !on);
                 btn.classList.toggle('hover:bg-stone-50', !on);
             });
-            ['Log', 'Rules', 'Status', 'History'].forEach(s => {
+            ['Log', 'Rules', 'Status'].forEach(s => {
                 document.getElementById('section' + s).classList.toggle('hidden', s.toLowerCase() !== name);
             });
         }
@@ -497,6 +542,52 @@
             return list;
         }
 
+        function renderVaxStatusCard(v) {
+            const lastVal = v.last_date ? fmtDate(v.last_date) : '—';
+            const nextVal = v.next_due ? fmtDate(v.next_due) : '—';
+            const nextOverdue = v.status === 'overdue';
+            return `<div class="vax-status-card">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                    <span class="text-sm font-medium text-stone-800">${escapeHtml(v.type_name)}</span>
+                    ${statusBadge(v.status)}
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="vax-date-cell">
+                        <div class="label">آخر تطعيم</div>
+                        <div class="value num">${escapeHtml(lastVal)}</div>
+                    </div>
+                    <div class="vax-date-cell${nextOverdue ? ' overdue' : ''}">
+                        <div class="label">الموعد التالي</div>
+                        <div class="value num">${escapeHtml(nextVal)}</div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function renderExpandedPanel(s) {
+            const applicable = (s.vaccinations || []).filter(v => v.status !== 'not_applicable');
+            const statusHtml = applicable.length
+                ? `<div class="space-y-2">${applicable.map(renderVaxStatusCard).join('')}</div>`
+                : '<p class="text-xs text-stone-400 text-center py-2">لا تنطبق قواعد تطعيم</p>';
+
+            if (sheepHistoryLoading.has(s.tag_id)) {
+                return statusHtml + '<p class="text-xs text-stone-400 text-center py-4 mt-3 border-t border-stone-100">جاري تحميل السجل...</p>';
+            }
+
+            const data = sheepHistoryData[s.tag_id];
+            const records = data?.records || [];
+            let historyHtml = '';
+            if (records.length) {
+                historyHtml = `<div class="mt-4 pt-3 border-t border-stone-100">
+                    <div class="text-[11px] font-medium text-stone-500 mb-2">السجل الكامل · <span class="num">${records.length}</span> تطعيم</div>
+                    ${renderSheepHistoryTimeline(records)}
+                </div>`;
+            } else if (data) {
+                historyHtml = '<p class="text-xs text-stone-400 text-center py-4 mt-3 border-t border-stone-100">لا توجد تطعيمات مسجّلة في السجل</p>';
+            }
+            return statusHtml + historyHtml;
+        }
+
         function renderSheepStatus() {
             const list = getFilteredSheep();
             const container = document.getElementById('sheepStatusList');
@@ -510,34 +601,104 @@
             }
             empty.classList.add('hidden');
             container.innerHTML = list.map(s => {
+                const expanded = expandedSheep.has(s.tag_id);
                 const name = s.name ? ` · ${escapeHtml(s.name)}` : '';
                 const breed = s.breed ? `<span class="text-stone-400"> · ${escapeHtml(s.breed)}</span>` : '';
-                const vaxRows = (s.vaccinations || []).filter(v => v.status !== 'not_applicable').map(v => {
-                    const due = v.next_due ? `<span class="text-stone-400 num"> · التالي: ${escapeHtml(fmtDate(v.next_due))}</span>` : '';
-                    const last = v.last_date ? `<span class="text-stone-400 num"> · آخر: ${escapeHtml(fmtDate(v.last_date))}</span>` : '';
-                    return `<div class="flex flex-wrap items-center gap-1.5 text-xs mt-1">
-                        <span class="font-medium text-stone-700">${escapeHtml(v.type_name)}</span>
-                        ${statusBadge(v.status)}${last}${due}
-                    </div>`;
-                }).join('');
-                return `<div class="sheep-card border border-stone-200 rounded-xl p-3 sm:p-4 bg-white">
-                    <div class="flex items-start justify-between gap-2 mb-2">
-                        <div>
+                const expandedPanel = expanded
+                    ? `<div class="mt-3 pt-3 border-t border-stone-100" data-history-panel="${escapeHtml(s.tag_id)}">${renderExpandedPanel(s)}</div>`
+                    : '';
+                return `<div class="sheep-card border border-stone-200 rounded-xl p-3 sm:p-4 bg-white ${expanded ? 'expanded' : ''}" data-sheep-card="${escapeHtml(s.tag_id)}">
+                    <button type="button" data-toggle-expand="${escapeHtml(s.tag_id)}" class="w-full flex items-start justify-between gap-2 text-right">
+                        <div class="min-w-0">
                             <span class="num font-bold text-base text-stone-900">${escapeHtml(s.tag_id)}</span>${name}${breed}
                             <div class="text-[11px] text-stone-400 mt-0.5">${escapeHtml(s.sheep_type || '')}</div>
                         </div>
-                        ${s.overall_status !== 'not_applicable' ? statusBadge(s.overall_status) : ''}
-                    </div>
-                    ${vaxRows || '<p class="text-xs text-stone-400">لا تنطبق قواعد تطعيم</p>'}
-                    <button type="button" data-quick-log="${escapeHtml(s.tag_id)}" class="mt-2 text-xs font-medium text-sky-600 hover:text-sky-800">+ تسجيل تطعيم سريع</button>
+                        <span class="expand-chevron text-stone-400 text-[10px] shrink-0 mt-1.5">▼</span>
+                    </button>
+                    ${expandedPanel}
+                    <button type="button" data-quick-log="${escapeHtml(s.tag_id)}" class="mt-2 text-xs font-medium text-sky-600 hover:text-sky-800">+ تسجيل تطعيم</button>
                 </div>`;
             }).join('');
+        }
+
+        function renderSheepHistoryTimeline(records) {
+            const grouped = {};
+            records.forEach(r => {
+                const key = r.type_name;
+                if (!grouped[key]) grouped[key] = [];
+                grouped[key].push(r);
+            });
+            return Object.entries(grouped).map(([typeName, items]) => {
+                const rows = items.map(r => {
+                    const meta = [r.dose, r.batch_number].filter(Boolean).map(escapeHtml).join(' · ');
+                    return `<div class="timeline-item">
+                        <div class="text-sm font-medium text-stone-800 num">${escapeHtml(fmtDate(r.administered_date))}</div>
+                        ${meta ? `<div class="text-xs text-stone-500 mt-0.5">${meta}</div>` : ''}
+                        ${r.notes ? `<div class="text-xs text-stone-400 mt-0.5">${escapeHtml(r.notes)}</div>` : ''}
+                        <button type="button" data-delete-record="${r.id}" class="text-[11px] text-stone-400 hover:text-red-600 mt-1">حذف</button>
+                    </div>`;
+                }).join('');
+                return `<div class="timeline-group">
+                    <div class="text-xs font-bold text-sky-700 mb-2 pb-1 border-b border-sky-100">${escapeHtml(typeName)} <span class="text-stone-400 font-normal">(${items.length})</span></div>
+                    <div class="pr-1">${rows}</div>
+                </div>`;
+            }).join('');
+        }
+
+        async function fetchSheepHistory(tagId) {
+            const res = await fetch(`/api/vaccinations/records?sheep_tag_id=${encodeURIComponent(tagId)}`);
+            if (!res.ok) throw new Error('fetch failed');
+            sheepHistoryData[tagId] = await res.json();
+            return sheepHistoryData[tagId];
+        }
+
+        async function toggleSheepExpand(tagId) {
+            if (expandedSheep.has(tagId)) {
+                expandedSheep.delete(tagId);
+                renderSheepStatus();
+                return;
+            }
+            expandedSheep.add(tagId);
+            renderSheepStatus();
+            if (!sheepHistoryData[tagId]) {
+                sheepHistoryLoading.add(tagId);
+                renderSheepStatus();
+                try {
+                    await fetchSheepHistory(tagId);
+                } catch {
+                    showToast('تعذر تحميل السجل', 'error');
+                    expandedSheep.delete(tagId);
+                }
+                sheepHistoryLoading.delete(tagId);
+                renderSheepStatus();
+            }
+        }
+
+        async function expandSheepAndScroll(tagId) {
+            setSection('status');
+            if (!getFilteredSheep().some(s => s.tag_id === tagId)) {
+                document.getElementById('statusSearch').value = tagId;
+                renderSheepStatus();
+            }
+            if (!expandedSheep.has(tagId)) await toggleSheepExpand(tagId);
+            requestAnimationFrame(() => {
+                const card = document.querySelector(`[data-sheep-card="${CSS.escape(tagId)}"]`);
+                card?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            });
+        }
+
+        function toggleRecentActivity() {
+            recentActivityExpanded = !recentActivityExpanded;
+            document.getElementById('recentActivityPanel').classList.toggle('hidden', !recentActivityExpanded);
+            document.getElementById('recentChevron').classList.toggle('rotate-180', recentActivityExpanded);
+            document.getElementById('recentActivityToggle').setAttribute('aria-expanded', recentActivityExpanded ? 'true' : 'false');
         }
 
         function renderHistory() {
             const records = dashboard.recent_records || [];
             const container = document.getElementById('historyList');
             const empty = document.getElementById('historyEmpty');
+            document.getElementById('recentCount').textContent = records.length ? `(${records.length})` : '';
             if (!records.length) {
                 container.innerHTML = '';
                 empty.classList.remove('hidden');
@@ -551,7 +712,7 @@
                     <div class="min-w-0">
                         <div class="text-sm font-medium">${escapeHtml(r.type_name)}</div>
                         <div class="text-xs text-stone-500 mt-0.5">
-                            <span class="num font-semibold">${escapeHtml(r.sheep_tag_id)}</span>${name}
+                            <button type="button" data-expand-sheep="${escapeHtml(r.sheep_tag_id)}" class="num font-semibold text-sky-600 hover:text-sky-800">${escapeHtml(r.sheep_tag_id)}</button>${name}
                             · <span class="num">${escapeHtml(fmtDate(r.administered_date))}</span>
                         </div>
                         ${meta ? `<div class="text-xs text-stone-400 mt-0.5">${meta}</div>` : ''}
@@ -560,6 +721,22 @@
                     <button type="button" data-delete-record="${r.id}" class="text-stone-400 hover:text-red-600 text-lg shrink-0" title="حذف">×</button>
                 </div>`;
             }).join('');
+        }
+
+        async function refreshExpandedHistories() {
+            const tags = [...expandedSheep];
+            sheepHistoryData = {};
+            for (const tag of tags) {
+                sheepHistoryLoading.add(tag);
+            }
+            renderSheepStatus();
+            await Promise.all(tags.map(async tag => {
+                try {
+                    await fetchSheepHistory(tag);
+                } catch { /* keep stale or empty */ }
+                sheepHistoryLoading.delete(tag);
+            }));
+            renderSheepStatus();
         }
 
         async function fetchDashboard() {
@@ -571,8 +748,12 @@
             renderSheepPicker();
             renderRules();
             renderFilterChips();
-            renderSheepStatus();
             renderHistory();
+            if (expandedSheep.size) {
+                await refreshExpandedHistories();
+            } else {
+                renderSheepStatus();
+            }
         }
 
         function resetRuleForm() {
@@ -751,7 +932,22 @@
             }
         });
 
-        document.getElementById('sheepStatusList').addEventListener('click', (e) => {
+        document.getElementById('sheepStatusList').addEventListener('click', async (e) => {
+            const expandBtn = e.target.closest('[data-toggle-expand]');
+            if (expandBtn) { await toggleSheepExpand(expandBtn.dataset.toggleExpand); return; }
+            const delBtn = e.target.closest('[data-delete-record]');
+            if (delBtn) {
+                if (!confirm('حذف سجل التطعيم؟')) return;
+                try {
+                    const res = await fetch(`/api/vaccinations/records/${delBtn.dataset.deleteRecord}`, { method: 'DELETE' });
+                    const result = await res.json();
+                    showToast(result.message, result.success !== false ? 'success' : 'error');
+                    if (result.success !== false) await fetchDashboard();
+                } catch {
+                    showToast('تعذر الحذف', 'error');
+                }
+                return;
+            }
             const btn = e.target.closest('[data-quick-log]');
             if (!btn) return;
             selectedSheep.clear();
@@ -761,7 +957,11 @@
             document.getElementById('logForm').scrollIntoView({ behavior: 'smooth' });
         });
 
+        document.getElementById('recentActivityToggle').addEventListener('click', toggleRecentActivity);
+
         document.getElementById('historyList').addEventListener('click', async (e) => {
+            const expandBtn = e.target.closest('[data-expand-sheep]');
+            if (expandBtn) { await expandSheepAndScroll(expandBtn.dataset.expandSheep); return; }
             const btn = e.target.closest('[data-delete-record]');
             if (!btn) return;
             if (!confirm('حذف سجل التطعيم؟')) return;
