@@ -1,4 +1,5 @@
 .venv/
+.env
 farm_data.db
 uploads/
 __pycache__/

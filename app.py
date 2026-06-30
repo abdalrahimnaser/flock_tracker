@@ -1,11 +1,11 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
-import sqlite3
 from datetime import date, datetime, timedelta
 from werkzeug.utils import secure_filename
 
+from db import IntegrityError, get_connection
+
 app = Flask(__name__)
-DB_NAME = "farm_data.db"
 MATING_REVIEW_DAYS = 20
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'sheep')
 ALLOWED_PHOTO_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp', 'gif'}
@@ -24,13 +24,8 @@ def delete_sheep_photo_file(filename):
     if os.path.isfile(path):
         os.remove(path)
 
-def get_connection():
-    conn = sqlite3.connect(DB_NAME)
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
-
 def init_db():
-    """Initializes the database with the expanded farm metrics spec sheet."""
+    """Initializes the PostgreSQL schema and seed data."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -41,88 +36,64 @@ def init_db():
             sheep_type TEXT,
             birth_date TEXT,
             purchase_date TEXT,
-            purchase_price REAL,
+            purchase_price DOUBLE PRECISION,
             purchase_location TEXT,
             breeding_date TEXT,
             breeding_type TEXT,
             notes TEXT,
             mother_status TEXT,
-            mother_id TEXT,
+            mother_id TEXT REFERENCES sheep(tag_id) ON DELETE SET NULL,
             status TEXT,
-            pregnancy_status TEXT
+            pregnancy_status TEXT,
+            photo_filename TEXT
         )
     ''')
-    cursor.execute("PRAGMA table_info(sheep)")
-    columns = {row[1] for row in cursor.fetchall()}
-    if 'sheep_type' not in columns:
-        cursor.execute("ALTER TABLE sheep ADD COLUMN sheep_type TEXT")
-    if 'mother_status' not in columns:
-        cursor.execute("ALTER TABLE sheep ADD COLUMN mother_status TEXT")
-    if 'mother_id' not in columns:
-        cursor.execute("ALTER TABLE sheep ADD COLUMN mother_id TEXT")
-    if 'pregnancy_status' not in columns:
-        cursor.execute("ALTER TABLE sheep ADD COLUMN pregnancy_status TEXT")
-    if 'photo_filename' not in columns:
-        cursor.execute("ALTER TABLE sheep ADD COLUMN photo_filename TEXT")
-    migrate_sheep_status_column(cursor)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS matings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sheep_tag_id TEXT NOT NULL,
+            id SERIAL PRIMARY KEY,
+            sheep_tag_id TEXT NOT NULL REFERENCES sheep(tag_id) ON DELETE CASCADE,
             mated_date TEXT NOT NULL,
             notes TEXT,
             mating_type TEXT,
             result TEXT,
             completed_at TEXT,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY (sheep_tag_id) REFERENCES sheep(tag_id) ON DELETE CASCADE
+            created_at TEXT NOT NULL
         )
     ''')
-    cursor.execute("PRAGMA table_info(matings)")
-    mating_columns = {row[1] for row in cursor.fetchall()}
-    if 'mating_type' not in mating_columns:
-        cursor.execute("ALTER TABLE matings ADD COLUMN mating_type TEXT")
     cursor.execute(
         "UPDATE matings SET mating_type = 'natural' WHERE mating_type IS NULL OR mating_type = ''"
     )
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS ultrasounds (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            mating_id INTEGER NOT NULL,
+            id SERIAL PRIMARY KEY,
+            mating_id INTEGER NOT NULL REFERENCES matings(id) ON DELETE CASCADE,
             scan_date TEXT NOT NULL,
             result TEXT NOT NULL,
             fetus_count INTEGER,
             notes TEXT,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY (mating_id) REFERENCES matings(id) ON DELETE CASCADE
+            created_at TEXT NOT NULL
         )
     ''')
-    cursor.execute("PRAGMA table_info(ultrasounds)")
-    ultrasound_columns = {row[1] for row in cursor.fetchall()}
-    if 'fetus_count' not in ultrasound_columns:
-        cursor.execute("ALTER TABLE ultrasounds ADD COLUMN fetus_count INTEGER")
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS illnesses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sheep_tag_id TEXT NOT NULL,
+            id SERIAL PRIMARY KEY,
+            sheep_tag_id TEXT NOT NULL REFERENCES sheep(tag_id) ON DELETE CASCADE,
             onset_date TEXT NOT NULL,
             resolved_date TEXT,
             diagnosis TEXT,
             notes TEXT,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY (sheep_tag_id) REFERENCES sheep(tag_id) ON DELETE CASCADE
+            created_at TEXT NOT NULL
         )
     ''')
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS medications (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            illness_id INTEGER NOT NULL,
+            id SERIAL PRIMARY KEY,
+            illness_id INTEGER NOT NULL REFERENCES illnesses(id) ON DELETE CASCADE,
             administered_date TEXT NOT NULL,
             drug_name TEXT NOT NULL,
             dose TEXT,
             notes TEXT,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY (illness_id) REFERENCES illnesses(id) ON DELETE CASCADE
+            created_at TEXT NOT NULL
         )
     ''')
     cursor.execute("UPDATE sheep SET mother_status = 'أم' WHERE mother_status = 'آم'")
@@ -136,7 +107,7 @@ def init_db():
     )
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS budget_categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT NOT NULL UNIQUE,
             is_system INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL
@@ -144,26 +115,20 @@ def init_db():
     ''')
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS budget_transactions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             transaction_date TEXT NOT NULL,
-            amount REAL NOT NULL,
+            amount DOUBLE PRECISION NOT NULL,
             description TEXT,
-            category_id INTEGER,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY (category_id) REFERENCES budget_categories(id) ON DELETE SET NULL
+            category_id INTEGER REFERENCES budget_categories(id) ON DELETE SET NULL,
+            sold_sheep_tag_id TEXT REFERENCES sheep(tag_id) ON DELETE SET NULL,
+            created_at TEXT NOT NULL
         )
     ''')
-    cursor.execute("PRAGMA table_info(budget_transactions)")
-    budget_columns = {row[1] for row in cursor.fetchall()}
-    if 'category_id' not in budget_columns:
-        cursor.execute("ALTER TABLE budget_transactions ADD COLUMN category_id INTEGER REFERENCES budget_categories(id) ON DELETE SET NULL")
-    if 'sold_sheep_tag_id' not in budget_columns:
-        cursor.execute("ALTER TABLE budget_transactions ADD COLUMN sold_sheep_tag_id TEXT REFERENCES sheep(tag_id) ON DELETE SET NULL")
     seed_budget_categories(cursor)
     remove_budget_category_by_name(cursor, 'صيانة')
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS vaccination_types (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             interval_value INTEGER NOT NULL,
             interval_unit TEXT NOT NULL,
@@ -176,33 +141,19 @@ def init_db():
     ''')
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS vaccination_records (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            vaccination_type_id INTEGER NOT NULL,
-            sheep_tag_id TEXT NOT NULL,
+            id SERIAL PRIMARY KEY,
+            vaccination_type_id INTEGER NOT NULL REFERENCES vaccination_types(id) ON DELETE CASCADE,
+            sheep_tag_id TEXT NOT NULL REFERENCES sheep(tag_id) ON DELETE CASCADE,
             administered_date TEXT NOT NULL,
             dose TEXT,
             batch_number TEXT,
             notes TEXT,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY (vaccination_type_id) REFERENCES vaccination_types(id) ON DELETE CASCADE,
-            FOREIGN KEY (sheep_tag_id) REFERENCES sheep(tag_id) ON DELETE CASCADE
+            created_at TEXT NOT NULL
         )
     ''')
     seed_vaccination_types(cursor)
     conn.commit()
     conn.close()
-
-def migrate_sheep_status_column(cursor):
-    cursor.execute("PRAGMA table_info(sheep)")
-    columns = {row[1] for row in cursor.fetchall()}
-    if 'status' in columns:
-        cursor.execute("UPDATE sheep SET status = 'حي' WHERE status IS NULL OR status = ''")
-        return
-    if 'life_status' in columns:
-        cursor.execute("ALTER TABLE sheep RENAME COLUMN life_status TO status")
-    else:
-        cursor.execute("ALTER TABLE sheep ADD COLUMN status TEXT")
-    cursor.execute("UPDATE sheep SET status = 'حي' WHERE status IS NULL OR status = ''")
 
 def parse_sheep_status(value):
     status = (value or '').strip() or 'حي'
@@ -214,13 +165,13 @@ def revert_sheep_if_sold(cursor, tag_id):
     if not tag_id:
         return
     cursor.execute(
-        "UPDATE sheep SET status = 'حي' WHERE tag_id = ? AND status = 'مباع'",
+        "UPDATE sheep SET status = 'حي' WHERE tag_id = %s AND status = 'مباع'",
         (tag_id,),
     )
     sync_pregnancy_status(cursor, tag_id)
 
 def mark_sheep_as_sold(cursor, tag_id):
-    cursor.execute("SELECT status FROM sheep WHERE tag_id = ?", (tag_id,))
+    cursor.execute("SELECT status FROM sheep WHERE tag_id = %s", (tag_id,))
     row = cursor.fetchone()
     if not row:
         return False, f"رقم الخروف '{tag_id}' غير موجود في السجل."
@@ -228,7 +179,7 @@ def mark_sheep_as_sold(cursor, tag_id):
         return False, 'هذا الخروف مباع مسبقاً.'
     if row[0] == 'ميت':
         return False, 'لا يمكن تسجيل بيع لخروف ميت.'
-    cursor.execute("UPDATE sheep SET status = ? WHERE tag_id = ?", ('مباع', tag_id))
+    cursor.execute("UPDATE sheep SET status = %s WHERE tag_id = %s", ('مباع', tag_id))
     sync_pregnancy_status(cursor, tag_id)
     return True, None
 
@@ -359,19 +310,19 @@ def delete_reproduction_for_sheep(cursor, tag_id):
     """Remove mating/ultrasound history for a sheep."""
     if not tag_id:
         return
-    cursor.execute("DELETE FROM matings WHERE sheep_tag_id = ?", (tag_id,))
+    cursor.execute("DELETE FROM matings WHERE sheep_tag_id = %s", (tag_id,))
 
 def sync_mother_status(cursor, tag_id):
     """Set mother_status from whether this sheep actually has children."""
     if not tag_id:
         return
     cursor.execute(
-        "SELECT COUNT(*) FROM sheep WHERE mother_id = ?",
+        "SELECT COUNT(*) FROM sheep WHERE mother_id = %s",
         (tag_id,),
     )
     count = cursor.fetchone()[0]
     cursor.execute(
-        "UPDATE sheep SET mother_status = ? WHERE tag_id = ?",
+        "UPDATE sheep SET mother_status = %s WHERE tag_id = %s",
         ("أم" if count > 0 else "ليس أم بعد", tag_id),
     )
 
@@ -383,7 +334,7 @@ def sync_all_mother_statuses(cursor):
 def get_latest_mating_id(cursor, sheep_tag_id):
     cursor.execute('''
         SELECT id FROM matings
-        WHERE sheep_tag_id = ?
+        WHERE sheep_tag_id = %s
         ORDER BY mated_date DESC, id DESC
         LIMIT 1
     ''', (sheep_tag_id,))
@@ -402,7 +353,7 @@ def validate_latest_active_mating(cursor, mating_id):
 
 def compute_pregnancy_status(cursor, tag_id):
     cursor.execute(
-        "SELECT sheep_type, status FROM sheep WHERE tag_id = ?",
+        "SELECT sheep_type, status FROM sheep WHERE tag_id = %s",
         (tag_id,),
     )
     row = cursor.fetchone()
@@ -412,7 +363,7 @@ def compute_pregnancy_status(cursor, tag_id):
     cursor.execute('''
         SELECT m.id, m.completed_at
         FROM matings m
-        WHERE m.sheep_tag_id = ?
+        WHERE m.sheep_tag_id = %s
         ORDER BY m.mated_date DESC, m.id DESC
         LIMIT 1
     ''', (tag_id,))
@@ -424,7 +375,7 @@ def compute_pregnancy_status(cursor, tag_id):
 
     cursor.execute('''
         SELECT result FROM ultrasounds
-        WHERE mating_id = ?
+        WHERE mating_id = %s
         ORDER BY scan_date DESC, id DESC
         LIMIT 1
     ''', (mating_id,))
@@ -442,7 +393,7 @@ def sync_pregnancy_status(cursor, tag_id):
         return
     status = compute_pregnancy_status(cursor, tag_id)
     cursor.execute(
-        "UPDATE sheep SET pregnancy_status = ? WHERE tag_id = ?",
+        "UPDATE sheep SET pregnancy_status = %s WHERE tag_id = %s",
         (status, tag_id),
     )
 
@@ -458,7 +409,7 @@ def close_active_pregnancy(cursor, tag_id, completed_at=None):
     completed_at = completed_at or now_iso()
     cursor.execute('''
         SELECT m.id FROM matings m
-        WHERE m.sheep_tag_id = ? AND m.completed_at IS NULL
+        WHERE m.sheep_tag_id = %s AND m.completed_at IS NULL
           AND EXISTS (
               SELECT 1 FROM ultrasounds u
               WHERE u.mating_id = m.id AND u.result = 'pass'
@@ -469,7 +420,7 @@ def close_active_pregnancy(cursor, tag_id, completed_at=None):
     row = cursor.fetchone()
     if row:
         cursor.execute(
-            "UPDATE matings SET completed_at = ? WHERE id = ?",
+            "UPDATE matings SET completed_at = %s WHERE id = %s",
             (completed_at, row[0]),
         )
     sync_pregnancy_status(cursor, tag_id)
@@ -478,7 +429,7 @@ def fetch_matings_for_sheep(cursor, tag_id):
     cursor.execute('''
         SELECT id, mated_date, notes, mating_type, completed_at, created_at
         FROM matings
-        WHERE sheep_tag_id = ?
+        WHERE sheep_tag_id = %s
         ORDER BY mated_date DESC, id DESC
     ''', (tag_id,))
     matings = []
@@ -487,7 +438,7 @@ def fetch_matings_for_sheep(cursor, tag_id):
         cursor.execute('''
             SELECT id, scan_date, result, fetus_count, notes, created_at
             FROM ultrasounds
-            WHERE mating_id = ?
+            WHERE mating_id = %s
             ORDER BY scan_date DESC, id DESC
         ''', (mating_id,))
         ultrasounds = [
@@ -516,7 +467,7 @@ def fetch_illnesses_for_sheep(cursor, tag_id):
     cursor.execute('''
         SELECT id, onset_date, resolved_date, diagnosis, notes, created_at
         FROM illnesses
-        WHERE sheep_tag_id = ?
+        WHERE sheep_tag_id = %s
         ORDER BY onset_date DESC, id DESC
     ''', (tag_id,))
     illnesses = []
@@ -525,7 +476,7 @@ def fetch_illnesses_for_sheep(cursor, tag_id):
         cursor.execute('''
             SELECT id, administered_date, drug_name, dose, notes, created_at
             FROM medications
-            WHERE illness_id = ?
+            WHERE illness_id = %s
             ORDER BY administered_date DESC, id DESC
         ''', (illness_id,))
         medications = [
@@ -551,13 +502,13 @@ def fetch_illnesses_for_sheep(cursor, tag_id):
     return illnesses
 
 def get_sheep_or_404(cursor, tag_id):
-    cursor.execute(SHEEP_SELECT + " WHERE tag_id = ?", (tag_id,))
+    cursor.execute(SHEEP_SELECT + " WHERE tag_id = %s", (tag_id,))
     row = cursor.fetchone()
     return row
 
 def validate_ewe_for_mating(cursor, tag_id):
     cursor.execute(
-        "SELECT sheep_type, status FROM sheep WHERE tag_id = ?",
+        "SELECT sheep_type, status FROM sheep WHERE tag_id = %s",
         (tag_id,),
     )
     row = cursor.fetchone()
@@ -570,7 +521,7 @@ def validate_ewe_for_mating(cursor, tag_id):
     return True, None
 
 def validate_sheep_for_health(cursor, tag_id):
-    cursor.execute("SELECT status FROM sheep WHERE tag_id = ?", (tag_id,))
+    cursor.execute("SELECT status FROM sheep WHERE tag_id = %s", (tag_id,))
     row = cursor.fetchone()
     if not row:
         return False, f"رقم الخروف '{tag_id}' غير موجود في السجل."
@@ -580,7 +531,7 @@ def validate_sheep_for_health(cursor, tag_id):
 
 def get_illness_or_404(cursor, illness_id):
     cursor.execute(
-        "SELECT id, sheep_tag_id, onset_date, resolved_date, diagnosis, notes FROM illnesses WHERE id = ?",
+        "SELECT id, sheep_tag_id, onset_date, resolved_date, diagnosis, notes FROM illnesses WHERE id = %s",
         (illness_id,),
     )
     return cursor.fetchone()
@@ -590,13 +541,13 @@ def get_medication_or_404(cursor, medication_id):
         SELECT m.id, m.illness_id, i.sheep_tag_id
         FROM medications m
         JOIN illnesses i ON i.id = m.illness_id
-        WHERE m.id = ?
+        WHERE m.id = %s
     ''', (medication_id,))
     return cursor.fetchone()
 
 def get_mating_or_404(cursor, mating_id):
     cursor.execute(
-        "SELECT id, sheep_tag_id, mated_date, notes, mating_type, completed_at FROM matings WHERE id = ?",
+        "SELECT id, sheep_tag_id, mated_date, notes, mating_type, completed_at FROM matings WHERE id = %s",
         (mating_id,),
     )
     return cursor.fetchone()
@@ -684,14 +635,14 @@ def add_sheep():
         cursor = conn.cursor()
 
         if mother_id:
-            cursor.execute("SELECT tag_id FROM sheep WHERE tag_id = ?", (mother_id,))
+            cursor.execute("SELECT tag_id FROM sheep WHERE tag_id = %s", (mother_id,))
             if not cursor.fetchone():
                 conn.close()
                 return jsonify({"success": False, "message": f"رقم الأم '{mother_id}' غير موجود في السجل."}), 400
 
         cursor.execute('''
             INSERT INTO sheep (tag_id, name, breed, sheep_type, birth_date, purchase_date, purchase_price, purchase_location, notes, mother_status, mother_id, status, pregnancy_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ''', (tag_id, name, breed, sheep_type, birth_date, purchase_date, purchase_price, purchase_location, notes, 'ليس أم بعد', mother_id or None, status, 'غير حامل'))
         sync_mother_status(cursor, tag_id)
         sync_mother_status(cursor, mother_id)
@@ -700,7 +651,7 @@ def add_sheep():
         conn.commit()
         conn.close()
         return jsonify({"success": True, "message": "تم حفظ بيانات الخروف بنجاح!"})
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         return jsonify({"success": False, "message": f"خطأ: رقم الخروف '{tag_id}' مسجل مسبقاً."}), 400
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
@@ -737,12 +688,12 @@ def update_sheep(tag_id):
         cursor = conn.cursor()
 
         if mother_id:
-            cursor.execute("SELECT tag_id FROM sheep WHERE tag_id = ?", (mother_id,))
+            cursor.execute("SELECT tag_id FROM sheep WHERE tag_id = %s", (mother_id,))
             if not cursor.fetchone():
                 conn.close()
                 return jsonify({"success": False, "message": f"رقم الأم '{mother_id}' غير موجود في السجل."}), 400
 
-        cursor.execute("SELECT mother_id FROM sheep WHERE tag_id = ?", (tag_id,))
+        cursor.execute("SELECT mother_id FROM sheep WHERE tag_id = %s", (tag_id,))
         row = cursor.fetchone()
         if not row:
             conn.close()
@@ -753,8 +704,8 @@ def update_sheep(tag_id):
 
         cursor.execute('''
             UPDATE sheep
-            SET name=?, breed=?, sheep_type=?, birth_date=?, purchase_date=?, purchase_price=?, purchase_location=?, notes=?, mother_id=?, status=?
-            WHERE tag_id=?
+            SET name=%s, breed=%s, sheep_type=%s, birth_date=%s, purchase_date=%s, purchase_price=%s, purchase_location=%s, notes=%s, mother_id=%s, status=%s
+            WHERE tag_id=%s
         ''', (name, breed, sheep_type, birth_date, purchase_date, purchase_price, purchase_location, notes, new_mother_id, status, tag_id))
         sync_mother_status(cursor, tag_id)
         sync_mother_status(cursor, new_mother_id)
@@ -785,7 +736,7 @@ def upload_sheep_photo(tag_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT photo_filename FROM sheep WHERE tag_id = ?", (tag_id,))
+        cursor.execute("SELECT photo_filename FROM sheep WHERE tag_id = %s", (tag_id,))
         row = cursor.fetchone()
         if not row:
             conn.close()
@@ -797,7 +748,7 @@ def upload_sheep_photo(tag_id):
         delete_sheep_photo_file(row[0])
         ensure_upload_folder()
         file.save(os.path.join(UPLOAD_FOLDER, filename))
-        cursor.execute("UPDATE sheep SET photo_filename = ? WHERE tag_id = ?", (filename, tag_id))
+        cursor.execute("UPDATE sheep SET photo_filename = %s WHERE tag_id = %s", (filename, tag_id))
         conn.commit()
         conn.close()
         return jsonify({
@@ -814,13 +765,13 @@ def delete_sheep_photo(tag_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT photo_filename FROM sheep WHERE tag_id = ?", (tag_id,))
+        cursor.execute("SELECT photo_filename FROM sheep WHERE tag_id = %s", (tag_id,))
         row = cursor.fetchone()
         if not row:
             conn.close()
             return jsonify({"success": False, "message": f"رقم الخروف '{tag_id}' غير موجود في السجل."}), 404
         delete_sheep_photo_file(row[0])
-        cursor.execute("UPDATE sheep SET photo_filename = NULL WHERE tag_id = ?", (tag_id,))
+        cursor.execute("UPDATE sheep SET photo_filename = NULL WHERE tag_id = %s", (tag_id,))
         conn.commit()
         conn.close()
         return jsonify({"success": True, "message": "تم حذف الصورة."})
@@ -833,13 +784,13 @@ def delete_sheep(tag_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT mother_id, photo_filename FROM sheep WHERE tag_id = ?", (tag_id,))
+        cursor.execute("SELECT mother_id, photo_filename FROM sheep WHERE tag_id = %s", (tag_id,))
         row = cursor.fetchone()
         mother_id = row[0] if row else None
         if row and row[1]:
             delete_sheep_photo_file(row[1])
         delete_reproduction_for_sheep(cursor, tag_id)
-        cursor.execute("DELETE FROM sheep WHERE tag_id=?", (tag_id,))
+        cursor.execute("DELETE FROM sheep WHERE tag_id=%s", (tag_id,))
         sync_mother_status(cursor, mother_id)
         conn.commit()
         conn.close()
@@ -870,13 +821,13 @@ def add_mating(tag_id):
             return jsonify({"success": False, "message": message}), 400
 
         cursor.execute('''
-            UPDATE matings SET completed_at = ?
-            WHERE sheep_tag_id = ? AND completed_at IS NULL
+            UPDATE matings SET completed_at = %s
+            WHERE sheep_tag_id = %s AND completed_at IS NULL
         ''', (now_iso(), tag_id))
 
         cursor.execute('''
             INSERT INTO matings (sheep_tag_id, mated_date, notes, mating_type, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
         ''', (tag_id, mated_date, notes, mating_type, now_iso()))
         sync_pregnancy_status(cursor, tag_id)
         conn.commit()
@@ -902,7 +853,7 @@ def update_mating(mating_id):
             return jsonify({"success": False, "message": "سجل التلقيح غير موجود."}), 404
 
         cursor.execute(
-            "UPDATE matings SET notes = ? WHERE id = ?",
+            "UPDATE matings SET notes = %s WHERE id = %s",
             ((notes or '').strip(), mating_id),
         )
         conn.commit()
@@ -921,7 +872,7 @@ def delete_mating(mating_id):
             conn.close()
             return jsonify({"success": False, "message": "سجل التلقيح غير موجود."}), 404
         sheep_tag_id = row[1]
-        cursor.execute("DELETE FROM matings WHERE id = ?", (mating_id,))
+        cursor.execute("DELETE FROM matings WHERE id = %s", (mating_id,))
         sync_pregnancy_status(cursor, sheep_tag_id)
         conn.commit()
         conn.close()
@@ -943,7 +894,7 @@ def complete_mating(mating_id):
             conn.close()
             return jsonify({"success": False, "message": error}), 400
         cursor.execute(
-            "SELECT 1 FROM ultrasounds WHERE mating_id = ? AND result = 'pass' LIMIT 1",
+            "SELECT 1 FROM ultrasounds WHERE mating_id = %s AND result = 'pass' LIMIT 1",
             (mating_id,),
         )
         if not cursor.fetchone():
@@ -951,12 +902,12 @@ def complete_mating(mating_id):
             return jsonify({"success": False, "message": "يمكن إغلاق دورة حمل ناجحة فقط."}), 400
         completed_at = now_iso()
         cursor.execute(
-            "UPDATE matings SET completed_at = ? WHERE id = ?",
+            "UPDATE matings SET completed_at = %s WHERE id = %s",
             (completed_at, mating_id),
         )
         cursor.execute('''
-            UPDATE matings SET completed_at = ?
-            WHERE sheep_tag_id = ? AND completed_at IS NULL AND id != ?
+            UPDATE matings SET completed_at = %s
+            WHERE sheep_tag_id = %s AND completed_at IS NULL AND id != %s
         ''', (completed_at, row[1], mating_id))
         sync_pregnancy_status(cursor, row[1])
         conn.commit()
@@ -995,7 +946,7 @@ def add_ultrasound(mating_id):
 
         cursor.execute('''
             INSERT INTO ultrasounds (mating_id, scan_date, result, fetus_count, notes, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s)
         ''', (mating_id, scan_date, result, fetus_count, notes, now_iso()))
         sync_pregnancy_status(cursor, row[1])
         conn.commit()
@@ -1029,7 +980,7 @@ def update_ultrasound(ultrasound_id):
             SELECT u.id, u.mating_id, m.sheep_tag_id
             FROM ultrasounds u
             JOIN matings m ON m.id = u.mating_id
-            WHERE u.id = ?
+            WHERE u.id = %s
         ''', (ultrasound_id,))
         row = cursor.fetchone()
         if not row:
@@ -1039,16 +990,16 @@ def update_ultrasound(ultrasound_id):
         updates = []
         values = []
         if scan_date is not None:
-            updates.append("scan_date = ?")
+            updates.append("scan_date = %s")
             values.append(scan_date.strip())
         if result is not None:
-            updates.append("result = ?")
+            updates.append("result = %s")
             values.append(result.strip())
         if notes is not None:
-            updates.append("notes = ?")
+            updates.append("notes = %s")
             values.append(notes.strip())
         if fetus_count_raw is not None:
-            updates.append("fetus_count = ?")
+            updates.append("fetus_count = %s")
             values.append(parse_fetus_count(fetus_count_raw))
 
         if not updates:
@@ -1057,7 +1008,7 @@ def update_ultrasound(ultrasound_id):
 
         values.append(ultrasound_id)
         cursor.execute(
-            f"UPDATE ultrasounds SET {', '.join(updates)} WHERE id = ?",
+            f"UPDATE ultrasounds SET {', '.join(updates)} WHERE id = %s",
             values,
         )
         sync_pregnancy_status(cursor, row[2])
@@ -1076,13 +1027,13 @@ def delete_ultrasound(ultrasound_id):
             SELECT u.id, m.sheep_tag_id
             FROM ultrasounds u
             JOIN matings m ON m.id = u.mating_id
-            WHERE u.id = ?
+            WHERE u.id = %s
         ''', (ultrasound_id,))
         row = cursor.fetchone()
         if not row:
             conn.close()
             return jsonify({"success": False, "message": "سجل السونار غير موجود."}), 404
-        cursor.execute("DELETE FROM ultrasounds WHERE id = ?", (ultrasound_id,))
+        cursor.execute("DELETE FROM ultrasounds WHERE id = %s", (ultrasound_id,))
         sync_pregnancy_status(cursor, row[1])
         conn.commit()
         conn.close()
@@ -1112,7 +1063,7 @@ def add_illness(tag_id):
 
         cursor.execute('''
             INSERT INTO illnesses (sheep_tag_id, onset_date, diagnosis, notes, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
         ''', (tag_id, onset_date, diagnosis, notes, now_iso()))
         conn.commit()
         conn.close()
@@ -1141,13 +1092,13 @@ def update_illness(illness_id):
         updates = []
         values = []
         if diagnosis is not None:
-            updates.append("diagnosis = ?")
+            updates.append("diagnosis = %s")
             values.append(diagnosis.strip())
         if notes is not None:
-            updates.append("notes = ?")
+            updates.append("notes = %s")
             values.append(notes.strip())
         if resolved_date is not None:
-            updates.append("resolved_date = ?")
+            updates.append("resolved_date = %s")
             values.append(resolved_date.strip() if resolved_date else None)
 
         if not updates:
@@ -1156,7 +1107,7 @@ def update_illness(illness_id):
 
         values.append(illness_id)
         cursor.execute(
-            f"UPDATE illnesses SET {', '.join(updates)} WHERE id = ?",
+            f"UPDATE illnesses SET {', '.join(updates)} WHERE id = %s",
             values,
         )
         conn.commit()
@@ -1176,7 +1127,7 @@ def delete_illness(illness_id):
         if not row:
             conn.close()
             return jsonify({"success": False, "message": "سجل المرض غير موجود."}), 404
-        cursor.execute("DELETE FROM illnesses WHERE id = ?", (illness_id,))
+        cursor.execute("DELETE FROM illnesses WHERE id = %s", (illness_id,))
         conn.commit()
         conn.close()
         return jsonify({"success": True, "message": "تم حذف سجل المرض."})
@@ -1212,7 +1163,7 @@ def add_medication(illness_id):
 
         cursor.execute('''
             INSERT INTO medications (illness_id, administered_date, drug_name, dose, notes, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s)
         ''', (illness_id, administered_date, drug_name, dose, notes, now_iso()))
         conn.commit()
         conn.close()
@@ -1244,16 +1195,16 @@ def update_medication(medication_id):
         updates = []
         values = []
         if administered_date is not None:
-            updates.append("administered_date = ?")
+            updates.append("administered_date = %s")
             values.append(administered_date.strip())
         if drug_name is not None:
-            updates.append("drug_name = ?")
+            updates.append("drug_name = %s")
             values.append(drug_name.strip())
         if dose is not None:
-            updates.append("dose = ?")
+            updates.append("dose = %s")
             values.append(dose.strip())
         if notes is not None:
-            updates.append("notes = ?")
+            updates.append("notes = %s")
             values.append(notes.strip())
 
         if not updates:
@@ -1262,7 +1213,7 @@ def update_medication(medication_id):
 
         values.append(medication_id)
         cursor.execute(
-            f"UPDATE medications SET {', '.join(updates)} WHERE id = ?",
+            f"UPDATE medications SET {', '.join(updates)} WHERE id = %s",
             values,
         )
         conn.commit()
@@ -1280,7 +1231,7 @@ def delete_medication(medication_id):
         if not row:
             conn.close()
             return jsonify({"success": False, "message": "سجل الدواء غير موجود."}), 404
-        cursor.execute("DELETE FROM medications WHERE id = ?", (medication_id,))
+        cursor.execute("DELETE FROM medications WHERE id = %s", (medication_id,))
         conn.commit()
         conn.close()
         return jsonify({"success": True, "message": "تم حذف سجل الدواء."})
@@ -1306,16 +1257,16 @@ def seed_budget_categories(cursor):
         return
     for name in DEFAULT_BUDGET_CATEGORIES:
         cursor.execute(
-            "INSERT OR IGNORE INTO budget_categories (name, is_system, created_at) VALUES (?, 1, ?)",
+            "INSERT INTO budget_categories (name, is_system, created_at) VALUES (%s, 1, %s) ON CONFLICT (name) DO NOTHING",
             (name, now_iso()),
         )
 
 def remove_budget_category_by_name(cursor, name):
-    cursor.execute("DELETE FROM budget_categories WHERE name = ?", (name,))
+    cursor.execute("DELETE FROM budget_categories WHERE name = %s", (name,))
 
 def fetch_budget_categories(cursor):
     cursor.execute(
-        "SELECT id, name, is_system FROM budget_categories ORDER BY is_system DESC, name COLLATE NOCASE ASC"
+        "SELECT id, name, is_system FROM budget_categories ORDER BY is_system DESC, LOWER(name) ASC"
     )
     return [
         {"id": row[0], "name": row[1], "is_system": bool(row[2])}
@@ -1324,7 +1275,7 @@ def fetch_budget_categories(cursor):
 
 def get_category_or_404(cursor, category_id):
     cursor.execute(
-        "SELECT id, name, is_system FROM budget_categories WHERE id = ?",
+        "SELECT id, name, is_system FROM budget_categories WHERE id = %s",
         (category_id,),
     )
     return cursor.fetchone()
@@ -1363,12 +1314,12 @@ def fetch_budget_summary(cursor):
 
     month_start = date.today().replace(day=1).isoformat()
     cursor.execute(
-        "SELECT COALESCE(SUM(amount), 0) FROM budget_transactions WHERE amount > 0 AND transaction_date >= ?",
+        "SELECT COALESCE(SUM(amount), 0) FROM budget_transactions WHERE amount > 0 AND transaction_date >= %s",
         (month_start,),
     )
     income_month = round(cursor.fetchone()[0], 2)
     cursor.execute(
-        "SELECT COALESCE(SUM(amount), 0) FROM budget_transactions WHERE amount < 0 AND transaction_date >= ?",
+        "SELECT COALESCE(SUM(amount), 0) FROM budget_transactions WHERE amount < 0 AND transaction_date >= %s",
         (month_start,),
     )
     expenses_month = round(abs(cursor.fetchone()[0]), 2)
@@ -1400,14 +1351,14 @@ def add_budget_category():
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO budget_categories (name, is_system, created_at) VALUES (?, 0, ?)",
+            "INSERT INTO budget_categories (name, is_system, created_at) VALUES (%s, 0, %s) RETURNING id",
             (name, now_iso()),
         )
+        category_id = cursor.fetchone()[0]
         conn.commit()
-        category_id = cursor.lastrowid
         conn.close()
         return jsonify({"success": True, "message": "تمت إضافة الفئة.", "id": category_id, "name": name})
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         return jsonify({"success": False, "message": "هذه الفئة موجودة مسبقاً."}), 400
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
@@ -1424,7 +1375,7 @@ def delete_budget_category(category_id):
         if row[2]:
             conn.close()
             return jsonify({"success": False, "message": "لا يمكن حذف الفئات الأساسية."}), 400
-        cursor.execute("DELETE FROM budget_categories WHERE id = ?", (category_id,))
+        cursor.execute("DELETE FROM budget_categories WHERE id = %s", (category_id,))
         conn.commit()
         conn.close()
         return jsonify({"success": True, "message": "تم حذف الفئة."})
@@ -1488,11 +1439,11 @@ def add_budget_transaction():
 
         cursor.execute(
             "INSERT INTO budget_transactions (transaction_date, amount, description, category_id, sold_sheep_tag_id, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
             (transaction_date, round(amount, 2), description, category_id, sold_tag, now_iso()),
         )
+        new_id = cursor.fetchone()[0]
         conn.commit()
-        new_id = cursor.lastrowid
         conn.close()
         return jsonify({"success": True, "message": "تم تسجيل الحركة.", "id": new_id})
     except Exception as e:
@@ -1524,7 +1475,7 @@ def update_budget_transaction(transaction_id):
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id FROM budget_transactions WHERE id = ?",
+            "SELECT id FROM budget_transactions WHERE id = %s",
             (transaction_id,),
         )
         if not cursor.fetchone():
@@ -1532,7 +1483,7 @@ def update_budget_transaction(transaction_id):
             return jsonify({"success": False, "message": "الحركة غير موجودة."}), 404
 
         cursor.execute(
-            "SELECT amount, sold_sheep_tag_id FROM budget_transactions WHERE id = ?",
+            "SELECT amount, sold_sheep_tag_id FROM budget_transactions WHERE id = %s",
             (transaction_id,),
         )
         current_row = cursor.fetchone()
@@ -1550,7 +1501,7 @@ def update_budget_transaction(transaction_id):
             else:
                 raw = category_id_raw if category_id_raw is not None else None
                 if raw is None and amount is None:
-                    cursor.execute("SELECT category_id FROM budget_transactions WHERE id = ?", (transaction_id,))
+                    cursor.execute("SELECT category_id FROM budget_transactions WHERE id = %s", (transaction_id,))
                     category_id = cursor.fetchone()[0]
                 else:
                     category_id, category_error = resolve_expense_category_id(cursor, raw, new_amount)
@@ -1592,19 +1543,19 @@ def update_budget_transaction(transaction_id):
         updates = []
         values = []
         if transaction_date is not None:
-            updates.append("transaction_date = ?")
+            updates.append("transaction_date = %s")
             values.append(transaction_date)
         if description is not None:
-            updates.append("description = ?")
+            updates.append("description = %s")
             values.append(description)
         if amount is not None:
-            updates.append("amount = ?")
+            updates.append("amount = %s")
             values.append(round(amount, 2))
         if category_touched:
-            updates.append("category_id = ?")
+            updates.append("category_id = %s")
             values.append(category_id)
         if sale_touched:
-            updates.append("sold_sheep_tag_id = ?")
+            updates.append("sold_sheep_tag_id = %s")
             values.append(new_sold_tag)
 
         if not updates:
@@ -1613,7 +1564,7 @@ def update_budget_transaction(transaction_id):
 
         values.append(transaction_id)
         cursor.execute(
-            f"UPDATE budget_transactions SET {', '.join(updates)} WHERE id = ?",
+            f"UPDATE budget_transactions SET {', '.join(updates)} WHERE id = %s",
             values,
         )
         conn.commit()
@@ -1628,7 +1579,7 @@ def delete_budget_transaction(transaction_id):
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT sold_sheep_tag_id FROM budget_transactions WHERE id = ?",
+            "SELECT sold_sheep_tag_id FROM budget_transactions WHERE id = %s",
             (transaction_id,),
         )
         row = cursor.fetchone()
@@ -1639,7 +1590,7 @@ def delete_budget_transaction(transaction_id):
         if sold_tag:
             revert_sheep_if_sold(cursor, sold_tag)
         cursor.execute(
-            "DELETE FROM budget_transactions WHERE id = ?",
+            "DELETE FROM budget_transactions WHERE id = %s",
             (transaction_id,),
         )
         if cursor.rowcount == 0:
@@ -1671,7 +1622,7 @@ def seed_vaccination_types(cursor):
     for name, interval_value, interval_unit, applies_to, min_age, notes in DEFAULT_VACCINATION_TYPES:
         cursor.execute(
             "INSERT INTO vaccination_types (name, interval_value, interval_unit, applies_to_sheep_type, min_age_days, notes, is_active, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, 1, ?)",
+            "VALUES (%s, %s, %s, %s, %s, %s, 1, %s)",
             (name, interval_value, interval_unit, applies_to, min_age, notes, now_iso()),
         )
 
@@ -1735,7 +1686,7 @@ def fetch_vaccination_types(cursor, active_only=False):
     )
     if active_only:
         query += " WHERE is_active = 1"
-    query += " ORDER BY name COLLATE NOCASE ASC"
+    query += " ORDER BY LOWER(name) ASC"
     cursor.execute(query)
     return [
         {
@@ -1755,7 +1706,7 @@ def fetch_vaccination_types(cursor, active_only=False):
 def fetch_vaccination_type_or_404(cursor, type_id):
     cursor.execute(
         "SELECT id, name, interval_value, interval_unit, applies_to_sheep_type, min_age_days, notes, is_active "
-        "FROM vaccination_types WHERE id = ?",
+        "FROM vaccination_types WHERE id = %s",
         (type_id,),
     )
     return cursor.fetchone()
@@ -1817,7 +1768,7 @@ def fetch_vaccination_records(cursor, limit=None, sheep_tag_id=None):
     '''
     params = []
     if sheep_tag_id:
-        query += " WHERE r.sheep_tag_id = ?"
+        query += " WHERE r.sheep_tag_id = %s"
         params.append(sheep_tag_id)
     query += " ORDER BY r.administered_date DESC, r.id DESC"
     if limit:
@@ -1942,11 +1893,11 @@ def add_vaccination_type():
         cursor = conn.cursor()
         cursor.execute(
             "INSERT INTO vaccination_types (name, interval_value, interval_unit, applies_to_sheep_type, min_age_days, notes, is_active, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, 1, ?)",
+            "VALUES (%s, %s, %s, %s, %s, %s, 1, %s) RETURNING id",
             (name, interval_value, interval_unit, applies_to, min_age_days, notes, now_iso()),
         )
+        new_id = cursor.fetchone()[0]
         conn.commit()
-        new_id = cursor.lastrowid
         conn.close()
         return jsonify({"success": True, "message": "تمت إضافة قاعدة التطعيم.", "id": new_id})
     except Exception as e:
@@ -1968,7 +1919,7 @@ def update_vaccination_type(type_id):
         if not name:
             conn.close()
             return jsonify({"success": False, "message": "الرجاء إدخال اسم التطعيم."}), 400
-        updates.append("name = ?")
+        updates.append("name = %s")
         values.append(name)
     if 'interval_value' in data or 'interval_unit' in data:
         row = fetch_vaccination_type_or_404(cursor, type_id)
@@ -1980,27 +1931,27 @@ def update_vaccination_type(type_id):
         if interval_error:
             conn.close()
             return jsonify({"success": False, "message": interval_error}), 400
-        updates.extend(["interval_value = ?", "interval_unit = ?"])
+        updates.extend(["interval_value = %s", "interval_unit = %s"])
         values.extend([interval_value, interval_unit])
     if 'applies_to_sheep_type' in data:
         applies_to = (data.get('applies_to_sheep_type') or '').strip() or None
         if applies_to and applies_to not in ('حملة', 'خروف'):
             conn.close()
             return jsonify({"success": False, "message": "نوع الخروف غير صالح."}), 400
-        updates.append("applies_to_sheep_type = ?")
+        updates.append("applies_to_sheep_type = %s")
         values.append(applies_to)
     if 'min_age_days' in data:
         min_age_days, min_age_error = parse_min_age_days(data)
         if min_age_error:
             conn.close()
             return jsonify({"success": False, "message": min_age_error}), 400
-        updates.append("min_age_days = ?")
+        updates.append("min_age_days = %s")
         values.append(min_age_days)
     if 'notes' in data:
-        updates.append("notes = ?")
+        updates.append("notes = %s")
         values.append((data.get('notes') or '').strip())
     if 'is_active' in data:
-        updates.append("is_active = ?")
+        updates.append("is_active = %s")
         values.append(1 if data.get('is_active') else 0)
 
     if not updates:
@@ -2008,7 +1959,7 @@ def update_vaccination_type(type_id):
         return jsonify({"success": False, "message": "لا توجد بيانات للتحديث."}), 400
 
     values.append(type_id)
-    cursor.execute(f"UPDATE vaccination_types SET {', '.join(updates)} WHERE id = ?", values)
+    cursor.execute(f"UPDATE vaccination_types SET {', '.join(updates)} WHERE id = %s", values)
     conn.commit()
     conn.close()
     return jsonify({"success": True, "message": "تم تحديث قاعدة التطعيم."})
@@ -2021,7 +1972,7 @@ def delete_vaccination_type(type_id):
         if not fetch_vaccination_type_or_404(cursor, type_id):
             conn.close()
             return jsonify({"success": False, "message": "قاعدة التطعيم غير موجودة."}), 404
-        cursor.execute("DELETE FROM vaccination_types WHERE id = ?", (type_id,))
+        cursor.execute("DELETE FROM vaccination_types WHERE id = %s", (type_id,))
         conn.commit()
         conn.close()
         return jsonify({"success": True, "message": "تم حذف قاعدة التطعيم."})
@@ -2045,7 +1996,7 @@ def get_vaccination_records():
     conn = get_connection()
     cursor = conn.cursor()
     if sheep_tag_id:
-        cursor.execute("SELECT tag_id, name, breed, sheep_type FROM sheep WHERE tag_id = ?", (sheep_tag_id,))
+        cursor.execute("SELECT tag_id, name, breed, sheep_type FROM sheep WHERE tag_id = %s", (sheep_tag_id,))
         sheep_row = cursor.fetchone()
         if not sheep_row:
             conn.close()
@@ -2113,7 +2064,7 @@ def add_vaccination_record():
 
         inserted = 0
         for tag_id in tag_ids:
-            cursor.execute("SELECT status FROM sheep WHERE tag_id = ?", (tag_id,))
+            cursor.execute("SELECT status FROM sheep WHERE tag_id = %s", (tag_id,))
             sheep_row = cursor.fetchone()
             if not sheep_row:
                 conn.rollback()
@@ -2125,7 +2076,7 @@ def add_vaccination_record():
                 return jsonify({"success": False, "message": f"يمكن تطعيم الحيوانات الأحياء فقط (رقم {tag_id})."}), 400
             cursor.execute(
                 "INSERT INTO vaccination_records (vaccination_type_id, sheep_tag_id, administered_date, dose, batch_number, notes, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
                 (type_id, tag_id, administered_date, dose, batch_number, notes, now_iso()),
             )
             inserted += 1
@@ -2141,11 +2092,11 @@ def delete_vaccination_record(record_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM vaccination_records WHERE id = ?", (record_id,))
+        cursor.execute("SELECT id FROM vaccination_records WHERE id = %s", (record_id,))
         if not cursor.fetchone():
             conn.close()
             return jsonify({"success": False, "message": "سجل التطعيم غير موجود."}), 404
-        cursor.execute("DELETE FROM vaccination_records WHERE id = ?", (record_id,))
+        cursor.execute("DELETE FROM vaccination_records WHERE id = %s", (record_id,))
         conn.commit()
         conn.close()
         return jsonify({"success": True, "message": "تم حذف سجل التطعيم."})
