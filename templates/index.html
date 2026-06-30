@@ -132,7 +132,7 @@
                             <div id="pregnancyFilters" class="flex flex-wrap gap-1.5"></div>
                         </div>
                         <div>
-                            <span class="text-xs font-medium text-stone-500 mb-2 block">حالة الأم</span>
+                            <span class="text-xs font-medium text-stone-500 mb-2 block">هل هي أم؟</span>
                             <div id="motherFilters" class="flex flex-wrap gap-1.5"></div>
                         </div>
                         <div>
@@ -288,7 +288,7 @@
                     </div>
                 </div>
                 <div class="p-3 bg-stone-50 rounded-lg border border-stone-200 space-y-3">
-                    <span class="block text-xs font-bold text-stone-500">حالة الأمومة</span>
+                    <span class="block text-xs font-bold text-stone-500">أم الخروف</span>
                     <div>
                         <label class="block text-xs font-medium mb-1 text-stone-500">رقم الأم</label>
                         <select id="mother_id" class="w-full bg-white border border-stone-300 rounded-lg p-2 text-stone-900 outline-none focus:ring-2 focus:ring-lime-500/40 focus:border-lime-500">
@@ -518,8 +518,8 @@
 
         const MOTHER_FILTER_OPTIONS = [
             { value: '', label: 'الكل' },
-            { value: 'أم', label: 'أم' },
-            { value: 'ليس أم بعد', label: 'ليس أم بعد' },
+            { value: 'نعم', label: 'نعم' },
+            { value: 'لا', label: 'لا' },
         ];
 
         const GENDER_FILTER_OPTIONS = [
@@ -790,7 +790,7 @@
         }
 
         function motherStatusLabel(sheep) {
-            return sheep.mother_status === 'أم' ? 'أم' : 'ليس أم بعد';
+            return sheep.mother_status === 'أم' ? 'نعم' : 'لا';
         }
 
         function filterChipClass(active) {
@@ -1760,13 +1760,13 @@
                     s.breed !== undefined ? detailRow('السلالة', breedLabel(s.breed)) : '',
                     s.sheep_type ? detailRow('الجنس', s.sheep_type) : '',
                     sheepStatus ? detailRow('الحالة', statusPill(sheepStatus, sheepStatusVariant(sheepStatus)), { raw: true }) : '',
+                    detailRow('هل هي أم؟', motherStatusLabel(s)),
+                    s.mother_id ? detailRow('رقم الأم', s.mother_id) : '',
                 ].filter(Boolean).join('');
 
                 const originRows = detailRow('مصدر الخروف', sheepOriginLabel(s));
 
                 const familyRows = [
-                    detailRow('حالة الأم', motherStatusLabel(s)),
-                    detailRow('رقم الأم', s.mother_id || 'غير محدد'),
                     liveChildren > 0 ? detailRow('أبناء أحياء', childCountLabel(liveChildren)) : '',
                     deadChildren > 0 ? detailRow('أبناء أموات', childCountLabel(deadChildren)) : '',
                     soldChildren > 0 ? detailRow('أبناء مباعون', childCountLabel(soldChildren)) : '',
@@ -1796,7 +1796,7 @@
                             </div>` : ''}
                         ${detailSection('البيانات الأساسية', identityRows)}
                         ${detailSection('المصدر', originRows)}
-                        ${familyRows ? detailSection('النسب والأبناء', familyRows) : ''}
+                        ${familyRows ? detailSection('الأبناء', familyRows) : ''}
                         ${purchaseSection}
                         ${reproSection}
                         ${healthSection}

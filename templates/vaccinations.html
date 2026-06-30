@@ -443,9 +443,8 @@
             if (query) sheep = sheep.filter(s => extractDigits(s.tag_id).includes(query));
             container.innerHTML = sheep.map(s => {
                 const on = selectedSheep.has(s.tag_id);
-                const name = s.name ? ` · ${escapeHtml(s.name)}` : '';
                 return `<button type="button" data-tag="${escapeHtml(s.tag_id)}" class="sheep-pick text-right text-xs px-2.5 py-2 rounded-lg border border-stone-200 bg-white transition ${on ? 'selected' : ''}">
-                    <span class="num font-semibold">${escapeHtml(s.tag_id)}</span>${name}
+                    <span class="num font-semibold">${escapeHtml(s.tag_id)}</span>
                 </button>`;
             }).join('') || '<p class="col-span-full text-center text-xs text-stone-400 py-4">لا توجد أغنام أحياء</p>';
             document.getElementById('pickCount').textContent = `${selectedSheep.size} محدد`;
@@ -564,14 +563,26 @@
             </div>`;
         }
 
+        function renderSheepBasicDetails(s) {
+            const isMother = s.mother_status === 'أم' ? 'نعم' : 'لا';
+            const rows = [
+                `<div class="flex justify-between gap-3 text-xs"><span class="text-stone-500">هل هي أم؟</span><span class="font-medium text-stone-800">${escapeHtml(isMother)}</span></div>`,
+            ];
+            if (s.mother_id) {
+                rows.push(`<div class="flex justify-between gap-3 text-xs"><span class="text-stone-500">رقم الأم</span><span class="num font-semibold text-stone-800">${escapeHtml(s.mother_id)}</span></div>`);
+            }
+            return `<div class="space-y-2 mb-3 pb-3 border-b border-stone-100">${rows.join('')}</div>`;
+        }
+
         function renderExpandedPanel(s) {
+            const basicHtml = renderSheepBasicDetails(s);
             const applicable = (s.vaccinations || []).filter(v => v.status !== 'not_applicable');
             const statusHtml = applicable.length
                 ? `<div class="space-y-2">${applicable.map(renderVaxStatusCard).join('')}</div>`
                 : '<p class="text-xs text-stone-400 text-center py-2">لا تنطبق قواعد تطعيم</p>';
 
             if (sheepHistoryLoading.has(s.tag_id)) {
-                return statusHtml + '<p class="text-xs text-stone-400 text-center py-4 mt-3 border-t border-stone-100">جاري تحميل السجل...</p>';
+                return basicHtml + statusHtml + '<p class="text-xs text-stone-400 text-center py-4 mt-3 border-t border-stone-100">جاري تحميل السجل...</p>';
             }
 
             const data = sheepHistoryData[s.tag_id];
@@ -585,7 +596,7 @@
             } else if (data) {
                 historyHtml = '<p class="text-xs text-stone-400 text-center py-4 mt-3 border-t border-stone-100">لا توجد تطعيمات مسجّلة في السجل</p>';
             }
-            return statusHtml + historyHtml;
+            return basicHtml + statusHtml + historyHtml;
         }
 
         function renderSheepStatus() {
@@ -602,16 +613,13 @@
             empty.classList.add('hidden');
             container.innerHTML = list.map(s => {
                 const expanded = expandedSheep.has(s.tag_id);
-                const name = s.name ? ` · ${escapeHtml(s.name)}` : '';
-                const breed = s.breed ? `<span class="text-stone-400"> · ${escapeHtml(s.breed)}</span>` : '';
                 const expandedPanel = expanded
                     ? `<div class="mt-3 pt-3 border-t border-stone-100" data-history-panel="${escapeHtml(s.tag_id)}">${renderExpandedPanel(s)}</div>`
                     : '';
                 return `<div class="sheep-card border border-stone-200 rounded-xl p-3 sm:p-4 bg-white ${expanded ? 'expanded' : ''}" data-sheep-card="${escapeHtml(s.tag_id)}">
                     <button type="button" data-toggle-expand="${escapeHtml(s.tag_id)}" class="w-full flex items-start justify-between gap-2 text-right">
                         <div class="min-w-0">
-                            <span class="num font-bold text-base text-stone-900">${escapeHtml(s.tag_id)}</span>${name}${breed}
-                            <div class="text-[11px] text-stone-400 mt-0.5">${escapeHtml(s.sheep_type || '')}</div>
+                            <span class="num font-bold text-xl text-stone-900 tracking-tight">${escapeHtml(s.tag_id)}</span>
                         </div>
                         <span class="expand-chevron text-stone-400 text-[10px] shrink-0 mt-1.5">▼</span>
                     </button>
@@ -706,13 +714,12 @@
             }
             empty.classList.add('hidden');
             container.innerHTML = records.map(r => {
-                const name = r.sheep_name ? ` · ${escapeHtml(r.sheep_name)}` : '';
                 const meta = [r.dose, r.batch_number].filter(Boolean).map(escapeHtml).join(' · ');
                 return `<div class="record-row py-3 flex items-start justify-between gap-3">
                     <div class="min-w-0">
                         <div class="text-sm font-medium">${escapeHtml(r.type_name)}</div>
                         <div class="text-xs text-stone-500 mt-0.5">
-                            <button type="button" data-expand-sheep="${escapeHtml(r.sheep_tag_id)}" class="num font-semibold text-sky-600 hover:text-sky-800">${escapeHtml(r.sheep_tag_id)}</button>${name}
+                            <button type="button" data-expand-sheep="${escapeHtml(r.sheep_tag_id)}" class="num font-semibold text-sky-600 hover:text-sky-800">${escapeHtml(r.sheep_tag_id)}</button>
                             · <span class="num">${escapeHtml(fmtDate(r.administered_date))}</span>
                         </div>
                         ${meta ? `<div class="text-xs text-stone-400 mt-0.5">${meta}</div>` : ''}

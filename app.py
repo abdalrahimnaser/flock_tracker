@@ -1898,6 +1898,8 @@ def build_vaccination_dashboard(cursor, due_by=None):
             "breed": sheep["breed"],
             "sheep_type": sheep["sheep_type"],
             "birth_date": sheep["birth_date"],
+            "mother_id": sheep["mother_id"],
+            "mother_status": sheep["mother_status"],
             "status": sheep["status"],
             "overall_status": worst,
             "vaccinations": vaccinations,
